@@ -1,0 +1,200 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  BUILD_DIR: "{{ .ROOT_DIR }}/bin"
+  DIST_DIR: "{{ .ROOT_DIR }}/dist"
+
+env:
+  LOG_LEVEL: "debug"
+
+tasks:
+  generate:
+    cmds:
+      - go generate -v ./...
+
+  test:
+    cmds:
+      - go test -v ./...
+
+  test-integration:
+    preconditions:
+      - sh: docker info > /dev/null 2>&1
+        msg: "Docker is not running. Please start Docker and try again."
+    cmds:
+      - task: generate
+      - go test -tags=integration -v ./...
+
+  lint:
+    cmds:
+      - golangci-lint run
+
+  test-cover:
+    preconditions:
+      - sh: docker info > /dev/null 2>&1
+        msg: "Docker is not running. Please start Docker and try again."
+    cmds:
+      - task: generate
+      - go clean -cache -testcache
+      - go test
+            -tags=integration
+            -covermode=atomic
+            -coverpkg=./...
+            -coverprofile=coverage.out
+            ./...
+      - go tool cover -func=coverage.out
+      - go-cover-treemap -coverprofile coverage.out -percent > "{{ .ROOT_DIR }}/contrib/coverage.svg"
+
+  test-lint:
+    cmds:
+      - task: test-integration
+      - task: lint
+
+  build-dev:
+    env:
+      GOOS: "{{ .GOOS | default .TASK_GOOS }}"
+      GOARCH: "{{ .GOARCH | default .TASK_GOARCH }}"
+      CGO_ENABLED: "{{ .CGO_ENABLED | default .TASK_CGO_ENABLED }}"
+    vars:
+      BUILD_VERSION: "0.0.0"
+      BUILD_DATE:
+        sh: date -u +"%Y-%m-%d %H:%M:%S"
+      BUILD_COMMIT:
+        sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+    cmds:
+      - task: generate
+      - mkdir -p {{ .BUILD_DIR }}
+      - go build -tags dev
+          -ldflags "-X 'main.buildVersion={{ .BUILD_VERSION }}-{{ .BUILD_COMMIT }}'
+          -X 'main.buildDate={{ .BUILD_DATE }}'
+          -X 'main.buildCommit={{ .BUILD_COMMIT }}'"
+          -o {{ .BUILD_DIR }}
+          {{ .ROOT_DIR }}/cmd/...
+
+  build-linux:
+    desc: Build Linux amd64 gophkeeper binaries
+    cmds:
+      - task: build-dev
+        vars:
+          TASK_GOOS: linux
+          TASK_GOARCH: amd64
+          TASK_CGO_ENABLED: 0
+
+  compose-up:
+    preconditions:
+      - sh: docker info > /dev/null 2>&1
+        msg: "Docker is not running. Please start Docker and try again."
+    cmds:
+      - task: build-linux
+      - docker compose
+          --file {{ .ROOT_DIR }}/docker-compose.yml
+          up
+
+  compose-clean:
+    preconditions:
+      - sh: docker info > /dev/null 2>&1
+        msg: "Docker is not running. Please start Docker and try again."
+    cmds:
+      - docker compose down -v --remove-orphans
+
+  run-client:
+    env:
+      GK_SERVER_URL: "https://127.0.0.1:8080"
+      GK_INSECURE_SKIP_VERIFY: "true"
+    cmds:
+      - task: build-dev
+      - "{{ .BUILD_DIR }}/client  {{ .CLI_ARGS }}"
+
+  run-server:
+    env:
+      GK_DEBUG: "true"
+      GK_DATABASE_URI: "postgres://postgres:postgres@localhost:15432/gophkeeper?sslmode=disable"
+      GK_S3_ENDPOINT: "localhost:8333"
+      GK_S3_ACCESS_KEY: "s3login"
+      GK_S3_SECRET_KEY: "s3pass123"
+      GK_TLS_CERT_FILE: "{{ .ROOT_DIR }}/contrib/cert/cert.pem"
+      GK_TLS_KEY_FILE: "{{ .ROOT_DIR }}/contrib/cert/key.pem"
+      GK_JWT_SECRET: "HANePj69NGoLvSghkxOBq3Oga1GMuGwZIqhrdjzIVQM="
+      GK_MASTER_KEY: "HANePj69NGoLvSghkxOBq3Oga1GMuGwZIqhrdjzIVQM="
+    cmds:
+      - task: build-dev
+      - "{{ .BUILD_DIR }}/server {{ .CLI_ARGS }}"
+
+  build-release:
+    desc: Build client and server binaries for a target platform
+    vars:
+      HOST_GOOS:
+        sh: go env GOOS
+      HOST_GOARCH:
+        sh: go env GOARCH
+      TARGET_GOOS: "{{ .GOOS | default .HOST_GOOS }}"
+      TARGET_GOARCH: "{{ .GOARCH | default .HOST_GOARCH }}"
+      VERSION: "{{ .VERSION | default \"0.0.0\" }}"
+      BUILD_DATE:
+        sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+      BUILD_COMMIT:
+        sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+      OUT_DIR: "{{ .BUILD_DIR }}/{{ .TARGET_GOOS }}_{{ .TARGET_GOARCH }}"
+      GOEXE:
+        sh: GOOS={{ .TARGET_GOOS }} GOARCH={{ .TARGET_GOARCH }} go env GOEXE
+    env:
+      GOOS: "{{ .TARGET_GOOS }}"
+      GOARCH: "{{ .TARGET_GOARCH }}"
+      CGO_ENABLED: "{{ .CGO_ENABLED | default 0 }}"
+    cmds:
+      - mkdir -p {{ .OUT_DIR }}
+      - go build -ldflags "-X 'main.buildVersion={{ .VERSION }}' -X 'main.buildDate={{ .BUILD_DATE }}' -X 'main.buildCommit={{ .BUILD_COMMIT }}'" -o {{ .OUT_DIR }}/client{{ .GOEXE }} {{ .ROOT_DIR }}/cmd/client
+      - go build -ldflags "-X 'main.buildVersion={{ .VERSION }}' -X 'main.buildDate={{ .BUILD_DATE }}' -X 'main.buildCommit={{ .BUILD_COMMIT }}'" -o {{ .OUT_DIR }}/server{{ .GOEXE }} {{ .ROOT_DIR }}/cmd/server
+
+  package-release:
+    desc: Build and archive binaries for a target platform
+    vars:
+      HOST_GOOS:
+        sh: go env GOOS
+      HOST_GOARCH:
+        sh: go env GOARCH
+      TARGET_GOOS: "{{ .GOOS | default .HOST_GOOS }}"
+      TARGET_GOARCH: "{{ .GOARCH | default .HOST_GOARCH }}"
+      VERSION: "{{ .VERSION | default \"0.0.0\" }}"
+      OUT_DIR: "{{ .BUILD_DIR }}/{{ .TARGET_GOOS }}_{{ .TARGET_GOARCH }}"
+      ARCHIVE_NAME: "{{ .ARCHIVE | default (printf \"%s_%s.tar.gz\" .TARGET_GOOS .TARGET_GOARCH) }}"
+    cmds:
+      - task: build-release
+        vars:
+          GOOS: "{{ .TARGET_GOOS }}"
+          GOARCH: "{{ .TARGET_GOARCH }}"
+          VERSION: "{{ .VERSION }}"
+          CGO_ENABLED: "{{ .CGO_ENABLED }}"
+      - mkdir -p {{ .DIST_DIR }}
+      - tar -czf {{ .DIST_DIR }}/{{ .ARCHIVE_NAME }} -C {{ .OUT_DIR }} .
+
+  release-artifacts:
+    desc: Build release archives for all supported platforms
+    cmds:
+      - task: package-release
+        vars:
+          GOOS: darwin
+          GOARCH: amd64
+          VERSION: "{{ .VERSION }}"
+      - task: package-release
+        vars:
+          GOOS: darwin
+          GOARCH: arm64
+          VERSION: "{{ .VERSION }}"
+      - task: package-release
+        vars:
+          GOOS: linux
+          GOARCH: amd64
+          VERSION: "{{ .VERSION }}"
+      - task: package-release
+        vars:
+          GOOS: linux
+          GOARCH: arm64
+          VERSION: "{{ .VERSION }}"
+      - task: package-release
+        vars:
+          GOOS: windows
+          GOARCH: amd64
+          VERSION: "{{ .VERSION }}"
+          ARCHIVE: "win_amd64.tar.gz"

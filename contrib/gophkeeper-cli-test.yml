@@ -1,0 +1,2 @@
+server_url: "config:8080"
+insecure_skip_verify: true

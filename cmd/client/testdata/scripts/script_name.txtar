@@ -1,0 +1,7 @@
+# success
+exec app
+stdout 'GophKeeper is a'
+
+# fail nonexistent flag
+! exec app --wrongflag
+stderr 'unknown flag'
