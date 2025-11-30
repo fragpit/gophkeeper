@@ -1,0 +1,86 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  BUILD_DIR: "{{ .ROOT_DIR }}/bin"
+
+env:
+  LOG_LEVEL: "debug"
+
+tasks:
+  generate:
+    cmds:
+      - go generate -v ./...
+
+  test:
+    cmds:
+      - task: generate
+      - go test -v ./...
+
+  lint:
+    cmds:
+      - golangci-lint-v2 run
+
+  test-lint:
+    cmds:
+      - task: test
+      - task: lint
+
+  build-dev:
+    env:
+      GOOS: "{{ .GOOS | default .TASK_GOOS }}"
+      GOARCH: "{{ .GOARCH | default .TASK_GOARCH }}"
+      CGO_ENABLED: "{{ .CGO_ENABLED | default .TASK_CGO_ENABLED }}"
+    vars:
+      BUILD_VERSION: "0.0.0"
+      BUILD_DATE:
+        sh: date -u +"%Y-%m-%d %H:%M:%S"
+      BUILD_COMMIT:
+        sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+    cmds:
+      - task: generate
+      - mkdir -p {{ .BUILD_DIR }}
+      - go build -tags dev
+          -ldflags "-X 'main.buildVersion={{ .BUILD_VERSION }}-{{ .BUILD_COMMIT }}'
+          -X 'main.buildDate={{ .BUILD_DATE }}'
+          -X 'main.buildCommit={{ .BUILD_COMMIT }}'"
+          -o {{ .BUILD_DIR }}
+          {{ .ROOT_DIR }}/cmd/...
+
+  build-linux:
+    desc: Build Linux amd64 gophkeeper binaries
+    cmds:
+      - task: build-dev
+        vars:
+          TASK_GOOS: linux
+          TASK_GOARCH: amd64
+          TASK_CGO_ENABLED: 0
+
+  compose-up:
+    cmds:
+      - task: build-linux
+      - docker compose
+          --file {{ .ROOT_DIR }}/docker-compose.yml
+          up
+
+  compose-clean:
+    cmds:
+      - docker compose down -v --remove-orphans
+
+  run-client:
+    cmds:
+      - task: build-dev
+      - "{{ .BUILD_DIR }}/client -s 'https://127.0.0.1:8080' {{ .CLI_ARGS }}"
+
+  run-server:
+    env:
+      GK_DEBUG: "true"
+      GK_DATABASE_URI: "postgres://postgres:postgres@localhost:15432/gophkeeper?sslmode=disable"
+      GK_TLS_CERT_FILE: "/Users/mag/Documents/job/code/learn/yandex-adv-go-dev/gophkeeper/contrib/cert/cert.pem"
+      GK_TLS_KEY_FILE: "/Users/mag/Documents/job/code/learn/yandex-adv-go-dev/gophkeeper/contrib/cert/key.pem"
+      GK_JWT_SECRET: "HANePj69NGoLvSghkxOBq3Oga1GMuGwZIqhrdjzIVQM="
+      GK_MASTER_KEY: "HANePj69NGoLvSghkxOBq3Oga1GMuGwZIqhrdjzIVQM="
+    cmds:
+      - task: build-dev
+      - "{{ .BUILD_DIR }}/server {{ .CLI_ARGS }}"
