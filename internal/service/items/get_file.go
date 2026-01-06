@@ -12,6 +12,7 @@ import (
 
 var _ handlers.GetFileService = (*GetFileService)(nil)
 
+// FileDecryptor decrypts file streams using provided keys.
 type FileDecryptor interface {
 	Encryptor
 	DecryptFileStream(
@@ -24,6 +25,7 @@ type FileDecryptor interface {
 	) error
 }
 
+// GetFileService retrieves encrypted items and decrypts their file payloads.
 type GetFileService struct {
 	repo     model.ItemsRepository
 	userRepo model.UsersRepository
@@ -31,6 +33,7 @@ type GetFileService struct {
 	store    ObjectStorer
 }
 
+// NewGetFileService constructs a GetFileService with the given dependencies.
 func NewGetFileService(
 	repo model.ItemsRepository,
 	userRepo model.UsersRepository,
@@ -45,6 +48,7 @@ func NewGetFileService(
 	}
 }
 
+// GetItemByTitle fetches an encrypted item by its title for the specified user.
 func (s *GetFileService) GetItemByTitle(
 	ctx context.Context,
 	userID int,
@@ -53,6 +57,7 @@ func (s *GetFileService) GetItemByTitle(
 	return s.repo.GetItemByTitle(ctx, userID, title)
 }
 
+// GetFileByItem retrieves and decrypts file content for the provided item.
 func (s *GetFileService) GetFileByItem(
 	ctx context.Context,
 	userID int,

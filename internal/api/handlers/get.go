@@ -13,6 +13,7 @@ import (
 )
 
 //go:generate mockgen -destination ./mocks/auth_mock_gen.go . AuthService
+// GetService fetches a single decrypted item for a user.
 type GetService interface {
 	GetItemByTitle(
 		ctx context.Context,
@@ -26,6 +27,7 @@ type getResponse struct {
 	Error string               `json:"error"`
 }
 
+// NewGetHandler returns an Echo handler that fetches an item by title.
 func NewGetHandler(svc GetService) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		v := c.Get("user")

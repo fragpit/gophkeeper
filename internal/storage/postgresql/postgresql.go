@@ -11,12 +11,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Repositories aggregates available PostgreSQL-backed repositories.
 type Repositories struct {
 	Healthcheck *healthCheckRepo
 	Users       *usersRepo
 	Items       *itemsRepo
 }
 
+// NewStorage initializes database connections and repositories.
 func NewStorage(ctx context.Context, dbDSN string) (*Repositories, error) {
 	dbPool, err := pgxpool.New(ctx, dbDSN)
 	if err != nil {

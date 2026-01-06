@@ -15,8 +15,10 @@ import (
 
 var _ items.ObjectStorer = (*S3Storage)(nil)
 
+// ErrS3ServerNotAvailable is returned when the S3 server cannot be reached.
 var ErrS3ServerNotAvailable error = errors.New("s3 server not available")
 
+// S3Storage implements ObjectStorer using an S3-compatible backend.
 type S3Storage struct {
 	client  *minio.Client
 	retrier *retry.Retrier
@@ -24,6 +26,7 @@ type S3Storage struct {
 
 const objectBucket = "gophkeeper"
 
+// NewS3Storage initializes an S3Storage client with retries and bucket setup.
 func NewS3Storage(
 	ctx context.Context,
 	endpoint, accessKeyID, secretAccessKey string,
@@ -60,6 +63,7 @@ func NewS3Storage(
 	}, nil
 }
 
+// Put uploads an object to the configured bucket.
 func (s *S3Storage) Put(ctx context.Context, name string, r io.Reader) error {
 	return s.retrier.Do(ctx, func(ctx context.Context) error {
 		_, err := s.client.PutObject(
@@ -78,6 +82,7 @@ func (s *S3Storage) Put(ctx context.Context, name string, r io.Reader) error {
 	})
 }
 
+// Get downloads an object from the specified bucket.
 func (s *S3Storage) Get(
 	ctx context.Context,
 	bucket, name string,

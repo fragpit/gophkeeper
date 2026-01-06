@@ -13,6 +13,7 @@ import (
 )
 
 //go:generate mockgen -destination ./mocks/auth_mock_gen.go . AuthService
+// GetFileService retrieves encrypted items and associated file contents.
 type GetFileService interface {
 	GetItemByTitle(
 		ctx context.Context,
@@ -26,6 +27,7 @@ type GetFileService interface {
 	) (io.ReadCloser, error)
 }
 
+// NewGetFileHandler returns an Echo handler that downloads a file by item title.
 func NewGetFileHandler(svc GetFileService) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		v := c.Get("user")

@@ -6,11 +6,13 @@ import (
 	"resty.dev/v3"
 )
 
+// Client wraps HTTP interactions with the GophKeeper server.
 type Client struct {
 	http     *resty.Client
 	jwtToken []byte
 }
 
+// NewClient initializes a Client with the given server URL and auth token file.
 func NewClient(serverURL string, authFileName string) (*Client, error) {
 	httpClient := resty.New()
 	httpClient.

@@ -5,15 +5,18 @@ import (
 	"fmt"
 )
 
+// TokenSaver persists authentication tokens.
 type TokenSaver interface {
 	Save(ctx context.Context, token string) error
 }
 
+// LoginResponse represents a login response payload.
 type LoginResponse struct {
 	Token string `json:"token"`
 	Error string `json:"error"`
 }
 
+// Login authenticates a user and stores the received token.
 func (c *Client) Login(
 	ctx context.Context,
 	login, password string,

@@ -20,6 +20,7 @@ type usersRepo struct {
 	retrier *retry.Retrier
 }
 
+// NewUsersRepo creates a users repository backed by PostgreSQL.
 func NewUsersRepo(db *pgxpool.Pool, r *retry.Retrier) *usersRepo {
 	return &usersRepo{
 		db:      db,

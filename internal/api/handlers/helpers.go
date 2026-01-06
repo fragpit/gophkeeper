@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// ValidateParseJSONRequest validates Content-Type and decodes a JSON request body into data.
 func ValidateParseJSONRequest(
 	c echo.Context,
 	data any,

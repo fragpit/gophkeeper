@@ -15,6 +15,7 @@ type createFileResponse struct {
 	Error string `json:"error"`
 }
 
+// CreateFile uploads a file item to the server for the authenticated user.
 func (c *Client) CreateFile(
 	ctx context.Context,
 	item *model.ItemDecrypted,

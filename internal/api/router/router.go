@@ -23,6 +23,7 @@ const (
 	gracefulShutdownTimeout = 10 * time.Second
 )
 
+// ServiceDeps aggregates all services required by the HTTP router.
 type ServiceDeps struct {
 	AuthService       handlers.AuthService
 	HealthService     handlers.HealthService
@@ -33,6 +34,7 @@ type ServiceDeps struct {
 	GetFileService    handlers.GetFileService
 }
 
+// Router wraps the Echo HTTP server and its configuration.
 type Router struct {
 	router *echo.Echo
 
@@ -41,6 +43,7 @@ type Router struct {
 	TLSKeyFile    string
 }
 
+// NewRouter constructs a configured Router instance with the provided dependencies.
 func NewRouter(
 	deps ServiceDeps,
 	cfg *config.ServerConfig,
@@ -91,6 +94,7 @@ func NewRouter(
 	}, nil
 }
 
+// Run starts the HTTP server and waits for shutdown.
 func (r *Router) Run(ctx context.Context) error {
 	eg, egCtx := errgroup.WithContext(ctx)
 

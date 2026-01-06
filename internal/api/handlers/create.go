@@ -13,6 +13,7 @@ import (
 )
 
 //go:generate mockgen -destination ./mocks/auth_mock_gen.go . AuthService
+// CreateService stores new decrypted items for a user.
 type CreateService interface {
 	CreateItem(
 		ctx context.Context,
@@ -30,6 +31,7 @@ type createResponse struct {
 	Error string `json:"error"`
 }
 
+// NewCreateHandler returns an Echo handler that creates a new item.
 func NewCreateHandler(svc CreateService) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		v := c.Get("user")

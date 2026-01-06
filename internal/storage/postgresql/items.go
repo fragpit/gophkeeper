@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// ErrItemExists is returned when a duplicate item is inserted.
 var ErrItemExists = errors.New("item already exists")
 
 var _ model.ItemsRepository = (*itemsRepo)(nil)
@@ -21,6 +22,7 @@ type itemsRepo struct {
 	retrier *retry.Retrier
 }
 
+// NewItemsRepo creates an items repository backed by PostgreSQL.
 func NewItemsRepo(db *pgxpool.Pool, r *retry.Retrier) *itemsRepo {
 	return &itemsRepo{
 		db:      db,

@@ -9,10 +9,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+// ClientConfig holds client application settings.
 type ClientConfig struct {
 	ServerURL string `mapstructure:"server_url" validate:"required"`
 }
 
+// NewClientConfig loads and validates client configuration.
 func NewClientConfig() (*ClientConfig, error) {
 	cfg := &ClientConfig{}
 	if err := viper.Unmarshal(cfg); err != nil {

@@ -8,11 +8,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Claims extends JWT registered claims with application specific fields.
 type Claims struct {
 	jwt.RegisteredClaims
 	UserID int
 }
 
+// CreateJWTToken creates a signed JWT token for the given user ID with a TTL.
 func CreateJWTToken(
 	secret string,
 	ttl time.Duration,
@@ -33,6 +35,7 @@ func CreateJWTToken(
 	return tokenString, nil
 }
 
+// GetUserIDFromJWTToken parses a token and extracts the user ID claim.
 func GetUserIDFromJWTToken(secret string, tokenString string) (int, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(

@@ -9,10 +9,12 @@ import (
 
 var _ handlers.ItemsService = (*ItemsService)(nil)
 
+// ItemsService provides read-only item listing operations.
 type ItemsService struct {
 	repo model.ItemsRepository
 }
 
+// NewItemsService creates a new ItemsService with the provided repository.
 func NewItemsService(
 	repo model.ItemsRepository,
 ) *ItemsService {
@@ -21,6 +23,7 @@ func NewItemsService(
 	}
 }
 
+// List returns metadata of items for the specified user and type.
 func (s *ItemsService) List(
 	ctx context.Context,
 	userID int,

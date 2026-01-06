@@ -5,11 +5,13 @@ import (
 	"fmt"
 )
 
+// RegisterResponse represents a registration response payload.
 type RegisterResponse struct {
 	Token string `json:"token"`
 	Error string `json:"error"`
 }
 
+// Register registers a new user and saves the returned token.
 func (c *Client) Register(
 	ctx context.Context,
 	login, password string,

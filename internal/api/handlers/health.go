@@ -9,10 +9,12 @@ import (
 )
 
 //go:generate mockgen -destination ./mocks/health_mock_gen.go . HealthService
+// HealthService exposes a health check operation.
 type HealthService interface {
 	Check(ctx context.Context) error
 }
 
+// NewHealthHandler returns an Echo handler that performs a health check.
 func NewHealthHandler(
 	svc HealthService,
 ) echo.HandlerFunc {

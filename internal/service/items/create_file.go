@@ -21,6 +21,7 @@ const (
 	fileChunkSize = 10 << 20
 )
 
+// FileEncryptor encrypts file streams and derived keys.
 type FileEncryptor interface {
 	Encryptor
 	NewFileNoncePrefix() ([]byte, error)
@@ -34,6 +35,7 @@ type FileEncryptor interface {
 	) (int64, error)
 }
 
+// CreateFileService handles creation of encrypted file items and storage.
 type CreateFileService struct {
 	repo      model.ItemsRepository
 	userRepo  model.UsersRepository
@@ -41,6 +43,7 @@ type CreateFileService struct {
 	store     ObjectStorer
 }
 
+// NewCreateFileService constructs a CreateFileService instance.
 func NewCreateFileService(
 	repo model.ItemsRepository,
 	userRepo model.UsersRepository,
@@ -55,6 +58,7 @@ func NewCreateFileService(
 	}
 }
 
+// CreateFileItem encrypts file content and metadata, stores them, and creates the item entry.
 func (s *CreateFileService) CreateFileItem(
 	ctx context.Context,
 	userID int,

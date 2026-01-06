@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NewCreateCmd creates the parent command for item creation.
 func NewCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",

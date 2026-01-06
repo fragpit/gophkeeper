@@ -9,6 +9,7 @@ var buildVersion string
 var buildDate string
 var buildCommit string
 
+// NewVersionCmd creates the Cobra command that prints version information.
 func NewVersionCmd() *cobra.Command {
 	versionCmd := &cobra.Command{
 		Use:                "version",

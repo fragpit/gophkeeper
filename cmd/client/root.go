@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// CLI aggregates configuration and client dependencies.
 type CLI struct {
 	Cfg    *config.ClientConfig
 	Client *client.Client
@@ -23,11 +24,13 @@ var (
 	cli   CLI
 )
 
+// SafeConfig allows safe logging of configuration values.
 type SafeConfig struct {
 	viper      *viper.Viper
 	secretKeys map[string]struct{}
 }
 
+// DumpForDebug logs configuration values while masking secrets.
 func (c *SafeConfig) DumpForDebug() {
 	slog.Debug("dump configuration")
 
@@ -40,6 +43,7 @@ func (c *SafeConfig) DumpForDebug() {
 	}
 }
 
+// NewRootCmd builds the root Cobra command for the client application.
 func NewRootCmd() (*cobra.Command, error) {
 	rootCmd := &cobra.Command{
 		Use:   "gophkeeper-cli",

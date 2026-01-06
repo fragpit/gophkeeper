@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NewGetItemCmd creates the command for fetching a single item.
 func NewGetItemCmd() *cobra.Command {
 	var (
 		title    string

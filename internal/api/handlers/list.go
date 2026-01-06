@@ -13,6 +13,7 @@ import (
 )
 
 //go:generate mockgen -destination ./mocks/auth_mock_gen.go . AuthService
+// ItemsService describes listing operations for user items.
 type ItemsService interface {
 	List(
 		ctx context.Context,
@@ -26,6 +27,7 @@ type listResponse struct {
 	Error string           `json:"error"`
 }
 
+// NewListHandler returns an Echo handler that lists items for the authenticated user.
 func NewListHandler(svc ItemsService) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		v := c.Get("user")

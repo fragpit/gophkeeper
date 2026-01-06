@@ -9,11 +9,13 @@ import (
 	"github.com/fragpit/gophkeeper/internal/model"
 )
 
+// ListResponse represents a list items response payload.
 type ListResponse struct {
 	Items []model.ItemMeta `json:"items"`
 	Error string           `json:"error"`
 }
 
+// List retrieves and prints user items of a specific type.
 func (c *Client) List(
 	ctx context.Context,
 	iType string,

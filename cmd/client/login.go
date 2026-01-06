@@ -12,6 +12,7 @@ import (
 	"golang.org/x/term"
 )
 
+// NewLoginCmd creates the command for user login or registration.
 func NewLoginCmd() *cobra.Command {
 	loginCmd := &cobra.Command{
 		Use:     "login",

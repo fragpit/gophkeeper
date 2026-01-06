@@ -6,16 +6,22 @@ import (
 	"errors"
 )
 
+// ErrAlreadyExists is returned when an item with the same title already exists.
 var ErrAlreadyExists = errors.New("item already exists")
 
+// ItemType represents the type of stored item.
 type ItemType string
 
 const (
+	// ItemTypeLogin denotes a login/password item.
 	ItemTypeLogin ItemType = "login"
+	// ItemTypeNote denotes a text note item.
 	ItemTypeNote  ItemType = "note"
+	// ItemTypeFile denotes a file item.
 	ItemTypeFile  ItemType = "file"
 )
 
+// Valid reports whether the item type is supported.
 func (t ItemType) Valid() bool {
 	switch t {
 	case ItemTypeLogin, ItemTypeNote, ItemTypeFile:
@@ -25,6 +31,7 @@ func (t ItemType) Valid() bool {
 	}
 }
 
+// ItemsRepository defines storage operations for items.
 type ItemsRepository interface {
 	List(ctx context.Context, userID int, iType ItemType) ([]ItemMeta, error)
 	GetItemByTitle(
@@ -39,17 +46,20 @@ type ItemsRepository interface {
 	) (int, error)
 }
 
+// ItemMeta contains shared metadata for all item types.
 type ItemMeta struct {
 	Title string   `json:"title"`
 	Type  ItemType `json:"type"`
 }
 
+// ItemDecrypted holds decrypted item data.
 type ItemDecrypted struct {
 	*ItemMeta
 
 	Data json.RawMessage `json:"data"`
 }
 
+// ItemEncrypted stores encrypted item payloads and metadata.
 type ItemEncrypted struct {
 	*ItemMeta
 
@@ -60,6 +70,7 @@ type ItemEncrypted struct {
 	NoncePrefix []byte
 }
 
+// LoginData contains login item fields.
 type LoginData struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -67,10 +78,12 @@ type LoginData struct {
 	Notes    string `json:"notes"`
 }
 
+// NoteData contains note item data.
 type NoteData struct {
 	Data string `json:"data"`
 }
 
+// FileData describes stored file metadata.
 type FileData struct {
 	Filename    string `json:"filename"`
 	Notes       string `json:"notes"`

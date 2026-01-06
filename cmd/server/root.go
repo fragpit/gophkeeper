@@ -16,11 +16,13 @@ var (
 	debug bool
 )
 
+// SafeConfig allows controlled dumping of configuration values.
 type SafeConfig struct {
 	viper      *viper.Viper
 	secretKeys map[string]struct{}
 }
 
+// DumpForDebug logs configuration values while masking secret keys.
 func (c *SafeConfig) DumpForDebug() {
 	slog.Debug("dump configuration")
 
@@ -33,6 +35,7 @@ func (c *SafeConfig) DumpForDebug() {
 	}
 }
 
+// NewRootCmd builds the root Cobra command for the server application.
 func NewRootCmd() (*cobra.Command, error) {
 	rootCmd := &cobra.Command{
 		Use:   "gophkeeper",

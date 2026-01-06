@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NewListItemCmd creates the command that lists items with optional filters.
 func NewListItemCmd() *cobra.Command {
 	var iType string
 	itemCmd := &cobra.Command{

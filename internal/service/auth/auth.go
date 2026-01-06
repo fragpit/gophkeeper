@@ -9,10 +9,12 @@ import (
 	"github.com/fragpit/gophkeeper/internal/model"
 )
 
+// DEKCreator produces encrypted data encryption keys for users.
 type DEKCreator interface {
 	CreateDEK() (*model.EncryptedDEK, error)
 }
 
+// AuthService manages user registration and authentication logic.
 type AuthService struct {
 	repo       model.UsersRepository
 	dekCreator DEKCreator
@@ -21,6 +23,7 @@ type AuthService struct {
 	jwtTTL    time.Duration
 }
 
+// NewAuthService constructs a new AuthService instance.
 func NewAuthService(
 	repo model.UsersRepository,
 	cryptor DEKCreator,
@@ -37,6 +40,7 @@ func NewAuthService(
 	}
 }
 
+// Register creates a new user and returns a signed JWT token.
 func (a *AuthService) Register(
 	ctx context.Context,
 	login, password string,
@@ -76,6 +80,7 @@ func (a *AuthService) Register(
 	return token, nil
 }
 
+// Login authenticates a user by login and password and issues a JWT token.
 func (a *AuthService) Login(
 	ctx context.Context,
 	login, password string,

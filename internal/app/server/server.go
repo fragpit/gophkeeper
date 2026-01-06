@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Run initializes dependencies and starts the server.
 func Run(ctx context.Context, cfg *config.ServerConfig) error {
 	slog.Info("staring gophkeeper server", "address", cfg.Address)
 

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// ServerConfig holds server configuration parameters.
 type ServerConfig struct {
 	Debug       bool          `mapstructure:"debug" validate:"boolean"`
 	Address     string        `mapstructure:"address" validate:"required"`
@@ -24,6 +25,7 @@ type ServerConfig struct {
 	MasterKey   string        `mapstructure:"master_key" validate:"required,base64"`
 }
 
+// NewServerConfig loads and validates server configuration.
 func NewServerConfig() (*ServerConfig, error) {
 	cfg := &ServerConfig{}
 	if err := viper.Unmarshal(cfg); err != nil {

@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NewListCmd creates the parent command for listing resources.
 func NewListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",

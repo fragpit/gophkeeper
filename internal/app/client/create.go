@@ -16,6 +16,7 @@ type createItemResponse struct {
 	Error string `json:"error"`
 }
 
+// CreateItem sends a request to create a new item for the authenticated user.
 func (c *Client) CreateItem(
 	ctx context.Context,
 	item *model.ItemDecrypted,

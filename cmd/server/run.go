@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NewRunCmd creates the Cobra command that starts the server.
 func NewRunCmd() *cobra.Command {
 	runCmd := &cobra.Command{
 		Use:           "run",

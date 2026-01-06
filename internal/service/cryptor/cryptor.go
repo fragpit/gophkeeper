@@ -20,16 +20,19 @@ var _ items.Encryptor = (*Cryptor)(nil)
 var _ items.FileEncryptor = (*Cryptor)(nil)
 var _ items.FileDecryptor = (*Cryptor)(nil)
 
+// Cryptor implements encryption and decryption helpers using AES-GCM.
 type Cryptor struct {
 	masterKey string
 }
 
+// NewCryptor creates a Cryptor instance bound to the provided master key.
 func NewCryptor(masterKey string) *Cryptor {
 	return &Cryptor{
 		masterKey: masterKey,
 	}
 }
 
+// CreateDEK generates a new encrypted data encryption key using the master key.
 func (c *Cryptor) CreateDEK() (*model.EncryptedDEK, error) {
 	key := sha256.Sum256([]byte(c.masterKey))
 
@@ -61,6 +64,7 @@ func (c *Cryptor) CreateDEK() (*model.EncryptedDEK, error) {
 	}, nil
 }
 
+// DecryptDEK decrypts an encrypted DEK using the master key.
 func (c *Cryptor) DecryptDEK(edek *model.EncryptedDEK) ([]byte, error) {
 	key := sha256.Sum256([]byte(c.masterKey))
 
@@ -82,6 +86,7 @@ func (c *Cryptor) DecryptDEK(edek *model.EncryptedDEK) ([]byte, error) {
 	return plainDEK, nil
 }
 
+// Encrypt encrypts arbitrary data with the provided DEK.
 func (c *Cryptor) Encrypt(dek, data []byte) ([]byte, []byte, error) {
 	aesBlock, err := aes.NewCipher(dek)
 	if err != nil {
@@ -102,6 +107,7 @@ func (c *Cryptor) Encrypt(dek, data []byte) ([]byte, []byte, error) {
 	return encrypted, nonce, nil
 }
 
+// Decrypt decrypts ciphertext with the provided DEK and nonce.
 func (c *Cryptor) Decrypt(dek, nonce, data []byte) ([]byte, error) {
 	aesBlock, err := aes.NewCipher(dek)
 	if err != nil {
@@ -121,6 +127,7 @@ func (c *Cryptor) Decrypt(dek, nonce, data []byte) ([]byte, error) {
 	return decrypted, nil
 }
 
+// EncryptFileStream encrypts a streaming reader into writer using chunked AES-GCM.
 func (c *Cryptor) EncryptFileStream(
 	dek []byte,
 	r io.Reader,
@@ -188,6 +195,7 @@ func (c *Cryptor) EncryptFileStream(
 	return total, nil
 }
 
+// DecryptFileStream decrypts an encrypted stream written by EncryptFileStream.
 func (c *Cryptor) DecryptFileStream(
 	dek []byte,
 	r io.Reader,
@@ -261,6 +269,7 @@ func (c *Cryptor) DecryptFileStream(
 	return nil
 }
 
+// NewFileNoncePrefix generates a nonce prefix for file encryption operations.
 func (c *Cryptor) NewFileNoncePrefix() ([]byte, error) {
 	return generateRandom(8)
 }

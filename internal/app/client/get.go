@@ -12,11 +12,13 @@ import (
 	"github.com/fragpit/gophkeeper/internal/model"
 )
 
+// GetResponse represents a response containing a decrypted item.
 type GetResponse struct {
 	Item  *model.ItemDecrypted `json:"item"`
 	Error string               `json:"error"`
 }
 
+// GetItem fetches an item by title and optionally downloads its file content.
 func (c *Client) GetItem(
 	ctx context.Context,
 	title string,

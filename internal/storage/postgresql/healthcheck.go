@@ -10,7 +10,9 @@ import (
 )
 
 var (
+	// ErrConnectionNotInitialized indicates database connection is missing.
 	ErrConnectionNotInitialized = errors.New("connection not initialized")
+	// ErrHealthCheckFailed signals that the health check failed.
 	ErrHealthCheckFailed        = errors.New("health check failed")
 )
 
@@ -21,6 +23,7 @@ type healthCheckRepo struct {
 	retrier *retry.Retrier
 }
 
+// NewHealthCheckRepo returns a health check repository backed by PostgreSQL.
 func NewHealthCheckRepo(db *pgxpool.Pool, r *retry.Retrier) *healthCheckRepo {
 	return &healthCheckRepo{
 		db:      db,

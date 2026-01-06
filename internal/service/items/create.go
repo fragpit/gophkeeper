@@ -11,12 +11,14 @@ import (
 
 var _ handlers.CreateService = (*CreateService)(nil)
 
+// CreateService handles creation of encrypted items.
 type CreateService struct {
 	repo      model.ItemsRepository
 	userRepo  model.UsersRepository
 	encryptor Encryptor
 }
 
+// NewCreateItemService constructs a CreateService instance.
 func NewCreateItemService(
 	repo model.ItemsRepository,
 	userRepo model.UsersRepository,
@@ -29,6 +31,7 @@ func NewCreateItemService(
 	}
 }
 
+// CreateItem encrypts and stores a decrypted item for the specified user.
 func (s *CreateService) CreateItem(
 	ctx context.Context,
 	userID int,

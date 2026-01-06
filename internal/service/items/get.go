@@ -10,12 +10,14 @@ import (
 
 var _ handlers.GetService = (*GetService)(nil)
 
+// GetService provides operations to retrieve and decrypt items.
 type GetService struct {
 	repo      model.ItemsRepository
 	userRepo  model.UsersRepository
 	encryptor Encryptor
 }
 
+// NewGetItemService constructs a GetService with the required dependencies.
 func NewGetItemService(
 	repo model.ItemsRepository,
 	userRepo model.UsersRepository,
@@ -28,6 +30,7 @@ func NewGetItemService(
 	}
 }
 
+// GetItemByTitle returns a decrypted item by its title for the given user.
 func (s *GetService) GetItemByTitle(
 	ctx context.Context,
 	userID int,

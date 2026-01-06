@@ -2,6 +2,7 @@ package items
 
 import "github.com/fragpit/gophkeeper/internal/model"
 
+// Encryptor encrypts and decrypts item data and encryption keys.
 type Encryptor interface {
 	Encrypt(dek, data []byte) (encryptedData []byte, nonce []byte, err error)
 	Decrypt(dek, nonce, data []byte) (decryptedData []byte, err error)

@@ -12,6 +12,7 @@ import (
 )
 
 //go:generate mockgen -destination ./mocks/auth_mock_gen.go . AuthService
+// AuthService provides user registration and authentication operations.
 type AuthService interface {
 	Register(ctx context.Context, login, password string) (string, error)
 	Login(ctx context.Context, login, password string) (string, error)
@@ -27,6 +28,7 @@ type authResponse struct {
 	Error string `json:"error"`
 }
 
+// NewAuthRegisterHandler handles user registration requests.
 func NewAuthRegisterHandler(svc AuthService) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var authReq authRequest
@@ -68,6 +70,7 @@ func NewAuthRegisterHandler(svc AuthService) echo.HandlerFunc {
 	}
 }
 
+// NewAuthLoginHandler handles user login requests.
 func NewAuthLoginHandler(svc AuthService) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var authReq authRequest

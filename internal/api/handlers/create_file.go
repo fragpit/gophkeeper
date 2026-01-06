@@ -15,6 +15,7 @@ import (
 )
 
 //go:generate mockgen -destination ./mocks/auth_mock_gen.go . AuthService
+// CreateFileService stores encrypted file items for a user.
 type CreateFileService interface {
 	CreateFileItem(
 		ctx context.Context,
@@ -30,6 +31,7 @@ type createFileResponse struct {
 	Error string `json:"error"`
 }
 
+// NewCreateFileHandler returns an Echo handler that uploads a file item.
 func NewCreateFileHandler(svc CreateFileService) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		v := c.Get("user")

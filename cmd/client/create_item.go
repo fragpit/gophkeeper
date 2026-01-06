@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ItemType describes an available item creation command.
 type ItemType struct {
 	Name        string
 	Description string
@@ -33,6 +34,7 @@ var itemTypes = []ItemType{
 	},
 }
 
+// NewCreateItemCmd creates the command group for item creation by type.
 func NewCreateItemCmd() *cobra.Command {
 	itemCmd := &cobra.Command{
 		Use:   "item",
