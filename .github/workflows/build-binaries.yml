@@ -1,0 +1,42 @@
+name: build binaries
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Setup Task
+        uses: arduino/setup-task@v1
+        with:
+          version: '3.x'
+
+      - name: Build client and server
+        shell: bash
+        run: task build-release GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} VERSION=ci

@@ -4,6 +4,7 @@ version: '3'
 
 vars:
   BUILD_DIR: "{{ .ROOT_DIR }}/bin"
+  DIST_DIR: "{{ .ROOT_DIR }}/dist"
 
 env:
   LOG_LEVEL: "debug"
@@ -84,3 +85,83 @@ tasks:
     cmds:
       - task: build-dev
       - "{{ .BUILD_DIR }}/server {{ .CLI_ARGS }}"
+
+  build-release:
+    desc: Build client and server binaries for a target platform
+    deps:
+      - generate
+    vars:
+      HOST_GOOS:
+        sh: go env GOOS
+      HOST_GOARCH:
+        sh: go env GOARCH
+      TARGET_GOOS: "{{ .GOOS | default .HOST_GOOS }}"
+      TARGET_GOARCH: "{{ .GOARCH | default .HOST_GOARCH }}"
+      VERSION: "{{ .VERSION | default \"0.0.0\" }}"
+      BUILD_DATE:
+        sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+      BUILD_COMMIT:
+        sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+      OUT_DIR: "{{ .BUILD_DIR }}/{{ .TARGET_GOOS }}_{{ .TARGET_GOARCH }}"
+      GOEXE:
+        sh: GOOS={{ .TARGET_GOOS }} GOARCH={{ .TARGET_GOARCH }} go env GOEXE
+    env:
+      GOOS: "{{ .TARGET_GOOS }}"
+      GOARCH: "{{ .TARGET_GOARCH }}"
+      CGO_ENABLED: "{{ .CGO_ENABLED | default 0 }}"
+    cmds:
+      - mkdir -p {{ .OUT_DIR }}
+      - go build -ldflags "-X 'main.buildVersion={{ .VERSION }}' -X 'main.buildDate={{ .BUILD_DATE }}' -X 'main.buildCommit={{ .BUILD_COMMIT }}'" -o {{ .OUT_DIR }}/client{{ .GOEXE }} {{ .ROOT_DIR }}/cmd/client
+      - go build -ldflags "-X 'main.buildVersion={{ .VERSION }}' -X 'main.buildDate={{ .BUILD_DATE }}' -X 'main.buildCommit={{ .BUILD_COMMIT }}'" -o {{ .OUT_DIR }}/server{{ .GOEXE }} {{ .ROOT_DIR }}/cmd/server
+
+  package-release:
+    desc: Build and archive binaries for a target platform
+    vars:
+      HOST_GOOS:
+        sh: go env GOOS
+      HOST_GOARCH:
+        sh: go env GOARCH
+      TARGET_GOOS: "{{ .GOOS | default .HOST_GOOS }}"
+      TARGET_GOARCH: "{{ .GOARCH | default .HOST_GOARCH }}"
+      VERSION: "{{ .VERSION | default \"0.0.0\" }}"
+      OUT_DIR: "{{ .BUILD_DIR }}/{{ .TARGET_GOOS }}_{{ .TARGET_GOARCH }}"
+      ARCHIVE_NAME: "{{ .ARCHIVE | default (printf \"%s_%s.tar.gz\" .TARGET_GOOS .TARGET_GOARCH) }}"
+    cmds:
+      - task: build-release
+        vars:
+          GOOS: "{{ .TARGET_GOOS }}"
+          GOARCH: "{{ .TARGET_GOARCH }}"
+          VERSION: "{{ .VERSION }}"
+          CGO_ENABLED: "{{ .CGO_ENABLED }}"
+      - mkdir -p {{ .DIST_DIR }}
+      - tar -czf {{ .DIST_DIR }}/{{ .ARCHIVE_NAME }} -C {{ .OUT_DIR }} .
+
+  release-artifacts:
+    desc: Build release archives for all supported platforms
+    cmds:
+      - task: package-release
+        vars:
+          GOOS: darwin
+          GOARCH: amd64
+          VERSION: "{{ .VERSION }}"
+      - task: package-release
+        vars:
+          GOOS: darwin
+          GOARCH: arm64
+          VERSION: "{{ .VERSION }}"
+      - task: package-release
+        vars:
+          GOOS: linux
+          GOARCH: amd64
+          VERSION: "{{ .VERSION }}"
+      - task: package-release
+        vars:
+          GOOS: linux
+          GOARCH: arm64
+          VERSION: "{{ .VERSION }}"
+      - task: package-release
+        vars:
+          GOOS: windows
+          GOARCH: amd64
+          VERSION: "{{ .VERSION }}"
+          ARCHIVE: "win_amd64.tar.gz"
