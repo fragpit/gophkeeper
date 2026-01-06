@@ -2,6 +2,8 @@ package buildinfo
 
 import "fmt"
 
+// PrintBuildInfo prints the build version, date, and commit information to standard output.
+// If any parameter is empty, it will be displayed as "N/A".
 func PrintBuildInfo(version, date, commit string) {
 	if version == "" {
 		version = "N/A"
