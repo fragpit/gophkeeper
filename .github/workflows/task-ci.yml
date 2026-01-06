@@ -20,12 +20,11 @@ jobs:
           cache: true
 
       - name: Install Task
-        uses: arduino/setup-task@v1
+        uses: arduino/setup-task@v2.0.0
 
       - name: Install golangci-lint
         run: |
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
-          ln -sf "$(go env GOPATH)/bin/golangci-lint" "$(go env GOPATH)/bin/golangci-lint-v2"
 
       - name: Run tests
         run: task test

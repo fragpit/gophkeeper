@@ -20,7 +20,7 @@ tasks:
 
   lint:
     cmds:
-      - golangci-lint-v2 run
+      - golangci-lint run
 
   test-lint:
     cmds:
