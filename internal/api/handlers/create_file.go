@@ -25,11 +25,6 @@ type CreateFileService interface {
 	) (int, error)
 }
 
-type createFileRequest struct {
-	Item *model.ItemDecrypted `json:"item"`
-	File []byte               `json:"file"`
-}
-
 type createFileResponse struct {
 	ID    int    `json:"id"`
 	Error string `json:"error"`
