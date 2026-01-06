@@ -1,0 +1,34 @@
+name: task ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Task
+        uses: arduino/setup-task@v1
+
+      - name: Install golangci-lint
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+          ln -sf "$(go env GOPATH)/bin/golangci-lint" "$(go env GOPATH)/bin/golangci-lint-v2"
+
+      - name: Run tests
+        run: task test
+
+      - name: Run linter
+        run: task lint
