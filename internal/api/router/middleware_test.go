@@ -85,7 +85,7 @@ func TestUserExistenceMiddleware(t *testing.T) {
 			e := echo.New()
 
 			// Create JWT token
-			token := jwt.NewWithClaims(jwt.SigningMethodHS256, &auth.Claims{
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, &auth.AccessClaims{
 				RegisteredClaims: jwt.RegisteredClaims{
 					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 				},

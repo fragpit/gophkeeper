@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/fragpit/gophkeeper/internal/model"
+	"resty.dev/v3"
 )
 
 type createFileResponse struct {
@@ -21,32 +23,53 @@ func (c *Client) CreateFile(
 	item *model.ItemDecrypted,
 	filePath string,
 ) error {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("open file: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-
 	itemJSON, err := json.Marshal(item)
 	if err != nil {
 		return fmt.Errorf("marshal item: %w", err)
 	}
 
 	filename := filepath.Base(filePath)
-	respData := &createFileResponse{}
-	resp, err := c.http.R().
-		SetContext(ctx).
-		SetAuthToken(string(c.jwtToken)).
-		SetMultipartFormData(map[string]string{
-			"item": string(itemJSON),
-		}).
-		SetMultipartField("file", filename, "application/octet-stream", f).
-		SetResult(respData).
-		Post("/api/create/file")
+
+	doRequest := func() (*resty.Response, *createFileResponse, error) {
+		f, err := os.Open(filePath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("open file: %w", err)
+		}
+		defer func() { _ = f.Close() }()
+
+		respData := &createFileResponse{}
+		resp, err := c.http.R().
+			SetContext(ctx).
+			SetAuthToken(string(c.accessToken)).
+			SetMultipartFormData(map[string]string{
+				"item": string(itemJSON),
+			}).
+			SetMultipartField("file", filename, "application/octet-stream", f).
+			SetResult(respData).
+			Post("/api/create/file")
+		if err != nil {
+			return nil, nil, err
+		}
+		return resp, respData, nil
+	}
+
+	resp, respData, err := doRequest()
 	if err != nil {
 		return fmt.Errorf("create file request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode() == http.StatusUnauthorized {
+		if err := c.refreshAccessToken(ctx); err != nil {
+			return fmt.Errorf("refresh access token: %w", err)
+		}
+
+		resp, respData, err = doRequest()
+		if err != nil {
+			return fmt.Errorf("create file request: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+	}
 
 	if resp.IsError() {
 		return handleErrorResponse(resp, "create file", respData.Error)

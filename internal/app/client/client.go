@@ -10,8 +10,9 @@ import (
 
 // Client wraps HTTP interactions with the GophKeeper server.
 type Client struct {
-	http     *resty.Client
-	jwtToken []byte
+	http         *resty.Client
+	accessToken  []byte
+	refreshToken []byte
 }
 
 // NewClient initializes a Client with the given server URL and auth token file.
@@ -29,14 +30,22 @@ func NewClient(
 		InsecureSkipVerify: insecureSkipVerify,
 	})
 
-	token, err := readTokenFromFile(authFileName)
+	tokens, err := readTokensFromFile(authFileName)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 
+	var accessToken string
+	var refreshToken string
+	if tokens != nil {
+		accessToken = tokens.AccessToken
+		refreshToken = tokens.RefreshToken
+	}
+
 	return &Client{
-		http:     httpClient,
-		jwtToken: token,
+		http:         httpClient,
+		accessToken:  []byte(accessToken),
+		refreshToken: []byte(refreshToken),
 	}, nil
 }
 

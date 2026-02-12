@@ -64,19 +64,6 @@ func TestClient_List(t *testing.T) {
 			wantErr:     false,
 		},
 		{
-			name:     "unauthorized error",
-			ctx:      context.Background(),
-			itemType: "login",
-			serverResponse: func(w http.ResponseWriter, r *http.Request) {
-				resp := ListResponse{Error: "invalid token"}
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusUnauthorized)
-				_ = json.NewEncoder(w).Encode(resp)
-			},
-			wantErr:     true,
-			errContains: "invalid token",
-		},
-		{
 			name:     "server error",
 			ctx:      context.Background(),
 			itemType: "file",
@@ -211,7 +198,7 @@ func TestClient_List(t *testing.T) {
 
 			client, err := NewClient(
 				server.URL,
-				createTempTokenFile(t, "test-token"),
+				createTempTokenFile(t, "test-token", "refresh-token"),
 				true,
 			)
 			require.NoError(t, err)
@@ -253,13 +240,113 @@ func TestClient_List(t *testing.T) {
 	}
 }
 
-func createTempTokenFile(t *testing.T, token string) string {
+func TestClient_List_RefreshFailure(t *testing.T) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc(
+		"/api/list/items",
+		func(w http.ResponseWriter, r *http.Request) {
+			resp := ListResponse{Error: "invalid token"}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(resp)
+		},
+	)
+
+	mux.HandleFunc("/api/refresh", func(w http.ResponseWriter, r *http.Request) {
+		resp := refreshTokenResponse{Error: "refresh token expired"}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	client, err := NewClient(
+		server.URL,
+		createTempTokenFile(t, "access-1", "refresh-1"),
+		true,
+	)
+	require.NoError(t, err)
+
+	err = client.List(context.Background(), "note")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refresh token expired")
+}
+
+func TestClient_List_RefreshSuccess(t *testing.T) {
+	callCount := 0
+	mux := http.NewServeMux()
+
+	mux.HandleFunc(
+		"/api/list/items",
+		func(w http.ResponseWriter, r *http.Request) {
+			callCount++
+			if callCount == 1 {
+				assert.Equal(t, "Bearer access-1", r.Header.Get("Authorization"))
+				resp := ListResponse{Error: "invalid token"}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = json.NewEncoder(w).Encode(resp)
+				return
+			}
+			assert.Equal(t, "Bearer access-2", r.Header.Get("Authorization"))
+			resp := ListResponse{
+				Items: []model.ItemMeta{{Title: "note1", Type: model.ItemTypeNote}},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(resp)
+		},
+	)
+
+	mux.HandleFunc("/api/refresh", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer refresh-1", r.Header.Get("Authorization"))
+		resp := refreshTokenResponse{
+			AccessToken:  "access-2",
+			RefreshToken: "refresh-2",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	client, err := NewClient(
+		server.URL,
+		createTempTokenFile(t, "access-1", "refresh-1"),
+		true,
+	)
+	require.NoError(t, err)
+
+	err = client.List(context.Background(), "note")
+	require.NoError(t, err)
+	assert.Equal(t, 2, callCount)
+}
+
+func createTempTokenFile(
+	t *testing.T,
+	accessToken string,
+	refreshToken string,
+) string {
 	t.Helper()
 	tmpFile, err := os.CreateTemp("", "token-*.txt")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.Remove(tmpFile.Name()) })
 
-	_, err = tmpFile.WriteString(token)
+	cfg := clientConfig{
+		Auth: authConfig{
+			AccessToken:  accessToken,
+			RefreshToken: refreshToken,
+		},
+	}
+	data, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	_, err = tmpFile.Write(data)
 	require.NoError(t, err)
 	_ = tmpFile.Close()
 

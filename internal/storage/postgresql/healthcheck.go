@@ -13,7 +13,7 @@ var (
 	// ErrConnectionNotInitialized indicates database connection is missing.
 	ErrConnectionNotInitialized = errors.New("connection not initialized")
 	// ErrHealthCheckFailed signals that the health check failed.
-	ErrHealthCheckFailed        = errors.New("health check failed")
+	ErrHealthCheckFailed = errors.New("health check failed")
 )
 
 var _ healthcheck.HealthRepository = (*healthCheckRepo)(nil)

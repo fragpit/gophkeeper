@@ -99,12 +99,15 @@ func NewRouter(
 		Skipper:    jwtAuthSkipper,
 		SigningKey: []byte(cfg.JWTSecret),
 		NewClaimsFunc: func(c *echo.Context) jwt.Claims {
-			return &auth.Claims{}
+			if c.Path() == "/api/refresh" {
+				return &auth.RefreshClaims{}
+			}
+			return &auth.AccessClaims{}
 		},
 	}))
-	api.Use(UserExistenceMiddleware(deps.UsersRepo))
 	api.POST("/register", handlers.NewAuthRegisterHandler(deps.AuthService))
 	api.POST("/login", handlers.NewAuthLoginHandler(deps.AuthService))
+	api.POST("/refresh", handlers.NewAuthRefreshHandler(deps.AuthService))
 	api.GET("/list/items", handlers.NewListHandler(deps.ItemsService))
 	api.GET("/get/item", handlers.NewGetHandler(deps.GetService))
 	api.GET("/get/file", handlers.NewGetFileHandler(deps.GetFileService))
@@ -137,7 +140,12 @@ func (r *Router) Run(ctx context.Context) error {
 		HidePort:        true,
 		CertFilesystem:  os.DirFS(filepath.Dir(r.TLSCertFile)),
 	}
-	if err := sc.StartTLS(ctx, r.router, filepath.Base(r.TLSCertFile), filepath.Base(r.TLSKeyFile)); err != nil {
+	if err := sc.StartTLS(
+		ctx,
+		r.router,
+		filepath.Base(r.TLSCertFile),
+		filepath.Base(r.TLSKeyFile),
+	); err != nil {
 		return fmt.Errorf("start tls server: %w", err)
 	}
 

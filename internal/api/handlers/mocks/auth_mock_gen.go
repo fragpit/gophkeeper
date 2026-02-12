@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	model "github.com/fragpit/gophkeeper/internal/model"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -41,10 +42,10 @@ func (m *MockAuthService) EXPECT() *MockAuthServiceMockRecorder {
 }
 
 // Login mocks base method.
-func (m *MockAuthService) Login(ctx context.Context, login, password string) (string, error) {
+func (m *MockAuthService) Login(ctx context.Context, login, password string) (*model.TokenPair, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Login", ctx, login, password)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(*model.TokenPair)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -55,11 +56,26 @@ func (mr *MockAuthServiceMockRecorder) Login(ctx, login, password any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockAuthService)(nil).Login), ctx, login, password)
 }
 
+// Refresh mocks base method.
+func (m *MockAuthService) Refresh(ctx context.Context, userID int, refreshToken string) (*model.TokenPair, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Refresh", ctx, userID, refreshToken)
+	ret0, _ := ret[0].(*model.TokenPair)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Refresh indicates an expected call of Refresh.
+func (mr *MockAuthServiceMockRecorder) Refresh(ctx, userID, refreshToken any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Refresh", reflect.TypeOf((*MockAuthService)(nil).Refresh), ctx, userID, refreshToken)
+}
+
 // Register mocks base method.
-func (m *MockAuthService) Register(ctx context.Context, login, password string) (string, error) {
+func (m *MockAuthService) Register(ctx context.Context, login, password string) (*model.TokenPair, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", ctx, login, password)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(*model.TokenPair)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -38,7 +38,7 @@ func NewGetFileHandler(svc GetFileService) echo.HandlerFunc {
 			return c.NoContent(http.StatusUnauthorized)
 		}
 
-		claims, ok := token.Claims.(*auth.Claims)
+		claims, ok := token.Claims.(*auth.AccessClaims)
 		if !ok {
 			return c.NoContent(http.StatusUnauthorized)
 		}

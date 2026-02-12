@@ -24,21 +24,21 @@ func (c *Client) CreateItem(
 	reqData := &createItemRequest{Item: item}
 
 	respData := &createItemResponse{}
-	resp, err := c.http.R().
+	req := c.http.R().
 		SetContext(ctx).
-		SetAuthToken(string(c.jwtToken)).
+		SetAuthToken(string(c.accessToken)).
 		SetBody(reqData).
 		SetResult(respData).
-		SetError(respData).
-		Post("/api/create/item")
+		SetError(respData)
+
+	resp, err := c.requestWithAuth(ctx, "/api/create/item", req, req.Post)
 	if err != nil {
 		return fmt.Errorf("create item request: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
 	if resp.IsError() {
 		return handleErrorResponse(resp, "create item", respData.Error)
 	}
+	defer func() { _ = resp.Body.Close() }()
 
 	fmt.Printf("created item, type %s, id %d", item.Type, respData.ID)
 

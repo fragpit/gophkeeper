@@ -61,6 +61,13 @@ func Run(ctx context.Context, cfg *config.ServerConfig) error {
 		return nil
 	})
 
+	eg.Go(func() error {
+		<-ctx.Done()
+		pgStorage.Close()
+		slog.Info("database connection pool closed")
+		return nil
+	})
+
 	err = eg.Wait()
 	if err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("server failed", "error", err)
@@ -80,10 +87,11 @@ func buildRouterDeps(
 
 	healthSvc := healthcheck.NewHealthcheckService(repos.Healthcheck)
 	authSvc := auth.NewAuthService(
-		repos.Users,
-		cryptoSvc,
 		cfg.JWTSecret,
 		cfg.JWTTTL,
+		cryptoSvc,
+		repos.Users,
+		repos.Tokens,
 	)
 	itemsSvc := items.NewItemsService(repos.Items)
 	createSvc := items.NewCreateItemService(repos.Items, repos.Users, cryptoSvc)

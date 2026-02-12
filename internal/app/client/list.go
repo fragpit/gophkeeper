@@ -21,23 +21,24 @@ func (c *Client) List(
 	iType string,
 ) error {
 	respData := &ListResponse{}
-	resp, err := c.http.R().
+
+	req := c.http.R().
 		SetContext(ctx).
-		SetAuthToken(string(c.jwtToken)).
+		SetAuthToken(string(c.accessToken)).
 		SetQueryParams(map[string]string{
 			"type": iType,
 		}).
 		SetResult(respData).
-		SetError(respData).
-		Get("/api/list/items")
-	if err != nil {
-		return fmt.Errorf("list items request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
+		SetError(respData)
 
+	resp, err := c.requestWithAuth(ctx, "/api/list/items", req, req.Get)
+	if err != nil {
+		return fmt.Errorf("list item request: %w", err)
+	}
 	if resp.IsError() {
 		return handleErrorResponse(resp, "list items", respData.Error)
 	}
+	defer func() { _ = resp.Body.Close() }()
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "#\ttitle\ttype")

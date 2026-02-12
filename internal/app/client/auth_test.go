@@ -36,7 +36,10 @@ func TestClient_Login(t *testing.T) {
 				assert.Equal(t, "testuser", body["login"])
 				assert.Equal(t, "testpass", body["password"])
 
-				resp := LoginResponse{Token: "jwt-token-123"}
+				resp := LoginResponse{
+					AccessToken:  "jwt-token-123",
+					RefreshToken: "refresh-123",
+				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(resp)
@@ -81,7 +84,10 @@ func TestClient_Login(t *testing.T) {
 			login:    "testuser",
 			password: "testpass",
 			serverResponse: func(w http.ResponseWriter, r *http.Request) {
-				resp := LoginResponse{Token: "jwt-token-123"}
+				resp := LoginResponse{
+					AccessToken:  "jwt-token-123",
+					RefreshToken: "refresh-123",
+				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(resp)
@@ -104,7 +110,10 @@ func TestClient_Login(t *testing.T) {
 			password: "testpass",
 			serverResponse: func(w http.ResponseWriter, r *http.Request) {
 				time.Sleep(100 * time.Millisecond)
-				resp := LoginResponse{Token: "jwt-token-123"}
+				resp := LoginResponse{
+					AccessToken:  "jwt-token-123",
+					RefreshToken: "refresh-123",
+				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(resp)
@@ -122,7 +131,10 @@ func TestClient_Login(t *testing.T) {
 				_ = json.NewDecoder(r.Body).Decode(&body)
 				assert.Equal(t, "", body["login"])
 
-				resp := LoginResponse{Token: "jwt-token-123"}
+				resp := LoginResponse{
+					AccessToken:  "jwt-token-123",
+					RefreshToken: "refresh-123",
+				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(resp)
@@ -139,7 +151,10 @@ func TestClient_Login(t *testing.T) {
 				_ = json.NewDecoder(r.Body).Decode(&body)
 				assert.Equal(t, "", body["password"])
 
-				resp := LoginResponse{Token: "jwt-token-123"}
+				resp := LoginResponse{
+					AccessToken:  "jwt-token-123",
+					RefreshToken: "refresh-123",
+				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(resp)
@@ -155,7 +170,7 @@ func TestClient_Login(t *testing.T) {
 
 			client, err := NewClient(
 				server.URL,
-				createTempTokenFile(t, "test-token"),
+				createTempTokenFile(t, "test-token", "refresh-token"),
 				true,
 			)
 			require.NoError(t, err)
@@ -199,7 +214,10 @@ func TestClient_Register(t *testing.T) {
 				assert.Equal(t, "newuser", body["login"])
 				assert.Equal(t, "newpass", body["password"])
 
-				resp := RegisterResponse{Token: "jwt-token-456"}
+				resp := RegisterResponse{
+					AccessToken:  "jwt-token-456",
+					RefreshToken: "refresh-456",
+				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(resp)
@@ -244,7 +262,10 @@ func TestClient_Register(t *testing.T) {
 			login:    "newuser",
 			password: "newpass",
 			serverResponse: func(w http.ResponseWriter, r *http.Request) {
-				resp := RegisterResponse{Token: "jwt-token-456"}
+				resp := RegisterResponse{
+					AccessToken:  "jwt-token-456",
+					RefreshToken: "refresh-456",
+				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(resp)
@@ -275,7 +296,7 @@ func TestClient_Register(t *testing.T) {
 
 			client, err := NewClient(
 				server.URL,
-				createTempTokenFile(t, "test-token"),
+				createTempTokenFile(t, "test-token", "refresh-token"),
 				true,
 			)
 			require.NoError(t, err)

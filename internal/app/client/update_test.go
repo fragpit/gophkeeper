@@ -101,26 +101,6 @@ func TestClient_UpdateItem(t *testing.T) {
 			errContains: "item already exists",
 		},
 		{
-			name:  "unauthorized",
-			ctx:   context.Background(),
-			title: "test",
-			item: &model.ItemDecrypted{
-				ItemMeta: &model.ItemMeta{
-					Title: "test",
-					Type:  model.ItemTypeLogin,
-				},
-				Data: []byte(`{}`),
-			},
-			serverResponse: func(w http.ResponseWriter, r *http.Request) {
-				resp := updateItemResponse{Error: "invalid token"}
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusUnauthorized)
-				_ = json.NewEncoder(w).Encode(resp)
-			},
-			wantErr:     true,
-			errContains: "invalid token",
-		},
-		{
 			name: "context canceled",
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -222,7 +202,7 @@ func TestClient_UpdateItem(t *testing.T) {
 
 			client, err := NewClient(
 				server.URL,
-				createTempTokenFile(t, "test-token"),
+				createTempTokenFile(t, "test-token", "refresh-token"),
 				true,
 			)
 			require.NoError(t, err)
@@ -246,4 +226,47 @@ func TestClient_UpdateItem(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClient_UpdateItem_RefreshFailure(t *testing.T) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc(
+		"/api/update/item",
+		func(w http.ResponseWriter, r *http.Request) {
+			resp := updateItemResponse{Error: "invalid token"}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(resp)
+		},
+	)
+
+	mux.HandleFunc("/api/refresh", func(w http.ResponseWriter, r *http.Request) {
+		resp := refreshTokenResponse{Error: "refresh token expired"}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	client, err := NewClient(
+		server.URL,
+		createTempTokenFile(t, "access-1", "refresh-1"),
+		true,
+	)
+	require.NoError(t, err)
+
+	item := &model.ItemDecrypted{
+		ItemMeta: &model.ItemMeta{
+			Title: "test",
+			Type:  model.ItemTypeLogin,
+		},
+		Data: []byte(`{}`),
+	}
+
+	err = client.UpdateItem(context.Background(), "test", item)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refresh token expired")
 }

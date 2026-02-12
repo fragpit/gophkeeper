@@ -31,22 +31,21 @@ func (c *Client) UpdateItem(
 	}
 
 	respData := &updateItemResponse{}
-	resp, err := c.http.R().
+	req := c.http.R().
 		SetContext(ctx).
-		SetAuthToken(string(c.jwtToken)).
+		SetAuthToken(string(c.accessToken)).
 		SetBody(reqData).
 		SetResult(respData).
-		SetError(respData).
-		Put("/api/update/item")
+		SetError(respData)
 
+	resp, err := c.requestWithAuth(ctx, "/api/update/item", req, req.Put)
 	if err != nil {
 		return fmt.Errorf("send update item request: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
 	if resp.IsError() {
 		return handleErrorResponse(resp, "update item", respData.Error)
 	}
+	defer func() { _ = resp.Body.Close() }()
 
 	slog.Info("item updated successfully", "title", item.Title)
 	return nil

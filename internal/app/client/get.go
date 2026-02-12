@@ -28,21 +28,21 @@ func (c *Client) GetItemMetadata(
 	}
 
 	respData := &GetResponse{}
-	resp, err := c.http.R().
+	req := c.http.R().
 		SetContext(ctx).
-		SetAuthToken(string(c.jwtToken)).
+		SetAuthToken(string(c.accessToken)).
 		SetQueryParam("title", title).
 		SetResult(respData).
-		SetError(respData).
-		Get("/api/get/item")
+		SetError(respData)
+
+	resp, err := c.requestWithAuth(ctx, "/api/get/item", req, req.Get)
 	if err != nil {
 		return nil, fmt.Errorf("get item request: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
 	if resp.IsError() {
 		return nil, handleErrorResponse(resp, "get item", respData.Error)
 	}
+	defer func() { _ = resp.Body.Close() }()
 
 	return respData.Item, nil
 }
@@ -58,15 +58,19 @@ func (c *Client) GetItem(
 	}
 
 	respData := &GetResponse{}
-	resp, err := c.http.R().
+	req := c.http.R().
 		SetContext(ctx).
-		SetAuthToken(string(c.jwtToken)).
+		SetAuthToken(string(c.accessToken)).
 		SetQueryParam("title", title).
 		SetResult(respData).
-		SetError(respData).
-		Get("/api/get/item")
+		SetError(respData)
+
+	resp, err := c.requestWithAuth(ctx, "/api/get/item", req, req.Get)
 	if err != nil {
 		return fmt.Errorf("get item request: %w", err)
+	}
+	if resp.IsError() {
+		return handleErrorResponse(resp, "get item", respData.Error)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -81,14 +85,18 @@ func (c *Client) GetItem(
 		if filePath == "" {
 			return fmt.Errorf("file path not provided")
 		}
-		resp, err := c.http.R().
+		req := c.http.R().
 			SetContext(ctx).
-			SetAuthToken(string(c.jwtToken)).
+			SetAuthToken(string(c.accessToken)).
 			SetQueryParam("title", title).
-			SetDoNotParseResponse(true).
-			Get("/api/get/file")
+			SetDoNotParseResponse(true)
+
+		resp, err := c.requestWithAuth(ctx, "/api/get/file", req, req.Get)
 		if err != nil {
 			return fmt.Errorf("get file request: %w", err)
+		}
+		if resp.IsError() {
+			return handleErrorResponse(resp, "get file", respData.Error)
 		}
 		defer func() { _ = resp.Body.Close() }()
 

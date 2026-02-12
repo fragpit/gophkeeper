@@ -8,7 +8,11 @@ import (
 
 func TestClient_SetDisableWarn(t *testing.T) {
 	t.Run("sets disable warn to true", func(t *testing.T) {
-		client, err := NewClient("http://localhost", "token123", true)
+		client, err := NewClient(
+			"http://localhost",
+			createTempTokenFile(t, "token123", "refresh123"),
+			true,
+		)
 		if err != nil {
 			t.Skip("skipping test that requires HTTP client initialization")
 		}
@@ -19,7 +23,11 @@ func TestClient_SetDisableWarn(t *testing.T) {
 	})
 
 	t.Run("sets disable warn to false", func(t *testing.T) {
-		client, err := NewClient("http://localhost", "token123", true)
+		client, err := NewClient(
+			"http://localhost",
+			createTempTokenFile(t, "token123", "refresh123"),
+			true,
+		)
 		if err != nil {
 			t.Skip("skipping test that requires HTTP client initialization")
 		}

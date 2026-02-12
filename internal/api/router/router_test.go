@@ -147,6 +147,7 @@ func TestJWTAuthSkipper(t *testing.T) {
 	}{
 		{"skip login path", "/api/login", true},
 		{"skip register path", "/api/register", true},
+		{"do not skip refresh path", "/api/refresh", false},
 		{"do not skip protected path", "/api/list/items", false},
 		{"do not skip get item path", "/api/get/item", false},
 		{"do not skip create item path", "/api/create/item", false},
@@ -219,7 +220,10 @@ func createTempTLSFiles(
 	}
 	certFile = certTempFile.Name()
 
-	if err := pem.Encode(certTempFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
+	if err := pem.Encode(
+		certTempFile,
+		&pem.Block{Type: "CERTIFICATE", Bytes: derBytes},
+	); err != nil {
 		t.Fatalf("Failed to encode cert: %v", err)
 	}
 	_ = certTempFile.Close()
@@ -232,7 +236,10 @@ func createTempTLSFiles(
 	keyFile = keyTempFile.Name()
 
 	privBytes := x509.MarshalPKCS1PrivateKey(priv)
-	if err := pem.Encode(keyTempFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes}); err != nil {
+	if err := pem.Encode(
+		keyTempFile,
+		&pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes},
+	); err != nil {
 		_ = os.Remove(certFile)
 		t.Fatalf("Failed to encode key: %v", err)
 	}
