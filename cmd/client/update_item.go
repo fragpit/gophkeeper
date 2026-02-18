@@ -50,12 +50,30 @@ func newUpdateLoginCmd() *cobra.Command {
 				return fmt.Errorf("--title is required to identify the item")
 			}
 
-			d, err := json.Marshal(model.LoginData{
-				Username: o.Username,
-				Password: o.Password,
-				URL:      o.URL,
-				Notes:    o.Notes,
-			})
+			existing, err := cli.Client.GetItemMetadata(cmd.Context(), o.Title)
+			if err != nil {
+				return fmt.Errorf("get existing item: %w", err)
+			}
+
+			var loginData model.LoginData
+			if err := json.Unmarshal(existing.Data, &loginData); err != nil {
+				return fmt.Errorf("unmarshal existing login data: %w", err)
+			}
+
+			if cmd.Flags().Changed("username") {
+				loginData.Username = o.Username
+			}
+			if cmd.Flags().Changed("password") {
+				loginData.Password = o.Password
+			}
+			if cmd.Flags().Changed("url") {
+				loginData.URL = o.URL
+			}
+			if cmd.Flags().Changed("notes") {
+				loginData.Notes = o.Notes
+			}
+
+			d, err := json.Marshal(loginData)
 			if err != nil {
 				return fmt.Errorf("marshal login data: %w", err)
 			}
@@ -73,7 +91,11 @@ func newUpdateLoginCmd() *cobra.Command {
 				Data: d,
 			}
 
-			if err := cli.Client.UpdateItem(cmd.Context(), o.Title, item); err != nil {
+			if err := cli.Client.UpdateItem(
+				cmd.Context(),
+				o.Title,
+				item,
+			); err != nil {
 				return fmt.Errorf("cmd update item: %w", err)
 			}
 
@@ -109,7 +131,21 @@ func newUpdateNoteCmd() *cobra.Command {
 				return fmt.Errorf("--title is required to identify the item")
 			}
 
-			d, err := json.Marshal(model.NoteData{Data: o.Data})
+			existing, err := cli.Client.GetItemMetadata(cmd.Context(), o.Title)
+			if err != nil {
+				return fmt.Errorf("get existing item: %w", err)
+			}
+
+			var noteData model.NoteData
+			if err := json.Unmarshal(existing.Data, &noteData); err != nil {
+				return fmt.Errorf("unmarshal existing note data: %w", err)
+			}
+
+			if cmd.Flags().Changed("data") {
+				noteData.Data = o.Data
+			}
+
+			d, err := json.Marshal(noteData)
 			if err != nil {
 				return fmt.Errorf("marshal note data: %w", err)
 			}
@@ -127,7 +163,11 @@ func newUpdateNoteCmd() *cobra.Command {
 				Data: d,
 			}
 
-			if err := cli.Client.UpdateItem(cmd.Context(), o.Title, item); err != nil {
+			if err := cli.Client.UpdateItem(
+				cmd.Context(),
+				o.Title,
+				item,
+			); err != nil {
 				return fmt.Errorf("cmd update item: %w", err)
 			}
 			return nil
@@ -163,47 +203,33 @@ If --path is not provided, only metadata (title, notes) will be updated.`,
 				return fmt.Errorf("--title is required to identify the item")
 			}
 
-			// Get current item metadata to preserve file information
 			currentItem, err := cli.Client.GetItemMetadata(cmd.Context(), o.Title)
 			if err != nil {
 				return fmt.Errorf("get current item: %w", err)
 			}
 
-			if currentItem.Type != "file" {
+			if currentItem.Type != model.ItemTypeFile {
 				return fmt.Errorf("item is not a file type")
 			}
 
-			// Parse current file data
-			var currentFileData model.FileData
+			var fileData model.FileData
 			if len(currentItem.Data) > 0 {
-				if err := json.Unmarshal(currentItem.Data, &currentFileData); err != nil {
+				if err := json.Unmarshal(currentItem.Data, &fileData); err != nil {
 					return fmt.Errorf("unmarshal current file data: %w", err)
 				}
+			}
+
+			if cmd.Flags().Changed("notes") {
+				fileData.Notes = o.Notes
+			}
+
+			if cmd.Flags().Changed("path") {
+				fileData.Filename = filepath.Base(o.FilePath)
 			}
 
 			title := o.Title
 			if o.NewTitle != "" {
 				title = o.NewTitle
-			}
-
-			// Prepare updated file data, preserving existing fields
-			fileData := model.FileData{
-				Filename:    currentFileData.Filename,
-				Notes:       currentFileData.Notes,
-				ContentType: currentFileData.ContentType,
-				Size:        currentFileData.Size,
-			}
-
-			// Update only specified fields
-			if o.Notes != "" {
-				fileData.Notes = o.Notes
-			}
-
-			// If path is provided, update filename
-			// Note: Actual file content update is not implemented yet
-			if o.FilePath != "" {
-				fileData.Filename = filepath.Base(o.FilePath)
-				// TODO: implement file content update (upload new file to S3)
 			}
 
 			d, err := json.Marshal(fileData)
@@ -219,7 +245,11 @@ If --path is not provided, only metadata (title, notes) will be updated.`,
 				Data: d,
 			}
 
-			if err := cli.Client.UpdateItem(cmd.Context(), o.Title, item); err != nil {
+			if err := cli.Client.UpdateItem(
+				cmd.Context(),
+				o.Title,
+				item,
+			); err != nil {
 				return fmt.Errorf("cmd update item: %w", err)
 			}
 
