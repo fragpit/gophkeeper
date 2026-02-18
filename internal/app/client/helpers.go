@@ -53,7 +53,7 @@ func (c *Client) refreshAccessToken(ctx context.Context) error {
 	c.accessToken = []byte(respData.AccessToken)
 	c.refreshToken = []byte(respData.RefreshToken)
 
-	if err := saveTokensToFile(model.TokenPair{
+	if err := saveTokensToFile(c.configFile, model.TokenPair{
 		AccessToken:  respData.AccessToken,
 		RefreshToken: respData.RefreshToken,
 	}); err != nil {

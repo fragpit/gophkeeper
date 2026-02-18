@@ -18,13 +18,7 @@ type authConfig struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func saveTokensToFile(tokens model.TokenPair) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("get user home dir: %w", err)
-	}
-
-	fileName := filepath.Join(homeDir, ".gophkeeper", "auth.cfg")
+func saveTokensToFile(fileName string, tokens model.TokenPair) error {
 	dir := filepath.Dir(fileName)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create auth directory: %w", err)

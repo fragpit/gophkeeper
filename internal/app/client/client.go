@@ -13,6 +13,7 @@ type Client struct {
 	http         *resty.Client
 	accessToken  []byte
 	refreshToken []byte
+	configFile   string
 }
 
 // NewClient initializes a Client with the given server URL and auth token file.
@@ -46,6 +47,7 @@ func NewClient(
 		http:         httpClient,
 		accessToken:  []byte(accessToken),
 		refreshToken: []byte(refreshToken),
+		configFile:   authFileName,
 	}, nil
 }
 

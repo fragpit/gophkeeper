@@ -38,7 +38,7 @@ func (c *Client) Register(
 		return handleErrorResponse(resp, "user register", respData.Error)
 	}
 
-	if err := saveTokensToFile(model.TokenPair{
+	if err := saveTokensToFile(c.configFile, model.TokenPair{
 		AccessToken:  respData.AccessToken,
 		RefreshToken: respData.RefreshToken,
 	}); err != nil {
