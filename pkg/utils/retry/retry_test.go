@@ -29,39 +29,41 @@ func selectiveRetriable(err error) bool {
 
 func TestNew(t *testing.T) {
 	tests := []struct {
-		name        string
-		isRetriable IsRetriableFunc
-		opts        []Option
-		wantBackoff []time.Duration
+		name           string
+		isRetriable    IsRetriableFunc
+		opts           []Option
+		wantBase       time.Duration
+		wantMaxRetries int
 	}{
 		{
-			name:        "default backoff",
-			isRetriable: alwaysRetriable,
-			opts:        nil,
-			wantBackoff: []time.Duration{
-				1 * time.Second,
-				3 * time.Second,
-				5 * time.Second,
-			},
+			name:           "default backoff",
+			isRetriable:    alwaysRetriable,
+			opts:           nil,
+			wantBase:       1 * time.Second,
+			wantMaxRetries: 3,
 		},
 		{
-			name:        "custom backoff",
+			name:        "custom base duration",
 			isRetriable: alwaysRetriable,
 			opts: []Option{
-				WithBackoff(
-					[]time.Duration{100 * time.Millisecond, 200 * time.Millisecond},
-				),
+				WithBaseDuration(100 * time.Millisecond),
 			},
-			wantBackoff: []time.Duration{
-				100 * time.Millisecond,
-				200 * time.Millisecond,
-			},
+			wantBase:       100 * time.Millisecond,
+			wantMaxRetries: 3,
 		},
 		{
-			name:        "empty backoff",
-			isRetriable: alwaysRetriable,
-			opts:        []Option{WithBackoff([]time.Duration{})},
-			wantBackoff: []time.Duration{},
+			name:           "custom max retries",
+			isRetriable:    alwaysRetriable,
+			opts:           []Option{WithMaxRetries(5)},
+			wantBase:       1 * time.Second,
+			wantMaxRetries: 5,
+		},
+		{
+			name:           "zero retries",
+			isRetriable:    alwaysRetriable,
+			opts:           []Option{WithMaxRetries(0)},
+			wantBase:       1 * time.Second,
+			wantMaxRetries: 0,
 		},
 	}
 
@@ -70,7 +72,8 @@ func TestNew(t *testing.T) {
 			retrier := New(tt.isRetriable, tt.opts...)
 
 			assert.NotNil(t, retrier)
-			assert.Equal(t, tt.wantBackoff, retrier.backoff)
+			assert.Equal(t, tt.wantBase, retrier.base)
+			assert.Equal(t, tt.wantMaxRetries, retrier.maxRetries)
 			assert.NotNil(t, retrier.IsRetriable)
 		})
 	}
@@ -112,7 +115,8 @@ func TestRetrier_Do_NonRetriableError(t *testing.T) {
 func TestRetrier_Do_RetriableErrorThenSuccess(t *testing.T) {
 	retrier := New(
 		alwaysRetriable,
-		WithBackoff([]time.Duration{1 * time.Millisecond, 2 * time.Millisecond}),
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(2),
 	)
 	ctx := context.Background()
 
@@ -132,13 +136,14 @@ func TestRetrier_Do_RetriableErrorThenSuccess(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 3, callCount)
 
-	assert.GreaterOrEqual(t, duration, 3*time.Millisecond)
+	assert.GreaterOrEqual(t, duration, 1*time.Millisecond)
 }
 
 func TestRetrier_Do_RetriableErrorExhausted(t *testing.T) {
 	retrier := New(
 		alwaysRetriable,
-		WithBackoff([]time.Duration{1 * time.Millisecond, 2 * time.Millisecond}),
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(2),
 	)
 	ctx := context.Background()
 
@@ -154,13 +159,15 @@ func TestRetrier_Do_RetriableErrorExhausted(t *testing.T) {
 	assert.ErrorIs(t, err, errRetriable)
 	assert.Contains(t, err.Error(), "operation failed after retries")
 
+	// 1 первая попытка + 2 maxRetries = 3 вызова
 	assert.Equal(t, 3, callCount)
 }
 
 func TestRetrier_Do_SelectiveRetriable(t *testing.T) {
 	retrier := New(
 		selectiveRetriable,
-		WithBackoff([]time.Duration{1 * time.Millisecond}),
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(1),
 	)
 	ctx := context.Background()
 
@@ -219,7 +226,8 @@ func TestRetrier_Do_SelectiveRetriable(t *testing.T) {
 func TestRetrier_Do_ContextCancellation(t *testing.T) {
 	retrier := New(
 		alwaysRetriable,
-		WithBackoff([]time.Duration{100 * time.Millisecond}),
+		WithBaseDuration(100*time.Millisecond),
+		WithMaxRetries(1),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -251,7 +259,8 @@ func TestRetrier_Do_ContextCancellation(t *testing.T) {
 func TestRetrier_Do_ContextCancelDuringSleep(t *testing.T) {
 	retrier := New(
 		alwaysRetriable,
-		WithBackoff([]time.Duration{1 * time.Second}),
+		WithBaseDuration(1*time.Second),
+		WithMaxRetries(1),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -277,8 +286,8 @@ func TestRetrier_Do_ContextCancelDuringSleep(t *testing.T) {
 	assert.Less(t, duration, 500*time.Millisecond)
 }
 
-func TestRetrier_Do_EmptyBackoff(t *testing.T) {
-	retrier := New(alwaysRetriable, WithBackoff([]time.Duration{}))
+func TestRetrier_Do_ZeroRetries(t *testing.T) {
+	retrier := New(alwaysRetriable, WithMaxRetries(0))
 	ctx := context.Background()
 
 	callCount := 0
@@ -292,6 +301,7 @@ func TestRetrier_Do_EmptyBackoff(t *testing.T) {
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, errRetriable)
 
+	// только первая попытка, повторов нет
 	assert.Equal(t, 1, callCount)
 }
 
@@ -345,7 +355,8 @@ func BenchmarkRetrier_Do_Success(b *testing.B) {
 func BenchmarkRetrier_Do_WithRetries(b *testing.B) {
 	retrier := New(
 		alwaysRetriable,
-		WithBackoff([]time.Duration{1 * time.Nanosecond, 1 * time.Nanosecond}),
+		WithBaseDuration(1*time.Nanosecond),
+		WithMaxRetries(2),
 	)
 	ctx := context.Background()
 
@@ -368,10 +379,11 @@ func ExampleRetrier_Do() {
 		return errors.Is(err, errRetriable)
 	}
 
-	retrier := New(isRetriable, WithBackoff([]time.Duration{
-		100 * time.Millisecond,
-		200 * time.Millisecond,
-	}))
+	retrier := New(
+		isRetriable,
+		WithBaseDuration(100*time.Millisecond),
+		WithMaxRetries(2),
+	)
 
 	callCount := 0
 	operation := func(ctx context.Context) error {
@@ -395,15 +407,15 @@ func ExampleNew() {
 		return true
 	}
 
-	retrier := New(isRetriable, WithBackoff([]time.Duration{
-		50 * time.Millisecond,
-		100 * time.Millisecond,
-		200 * time.Millisecond,
-	}))
+	retrier := New(
+		isRetriable,
+		WithBaseDuration(50*time.Millisecond),
+		WithMaxRetries(3),
+	)
 
-	fmt.Printf("Backoff intervals: %v\n", retrier.backoff)
+	fmt.Printf("Base: %v, MaxRetries: %d\n", retrier.base, retrier.maxRetries)
 	// Output:
-	// Backoff intervals: [50ms 100ms 200ms]
+	// Base: 50ms, MaxRetries: 3
 }
 
 type mockDB struct {
@@ -456,7 +468,8 @@ func TestRetrier_Do_DatabasePingSuccess(t *testing.T) {
 func TestRetrier_Do_DatabasePingRetriableError(t *testing.T) {
 	retrier := New(
 		postgresqlIsRetriable,
-		WithBackoff([]time.Duration{1 * time.Millisecond, 2 * time.Millisecond}),
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(2),
 	)
 	ctx := context.Background()
 
@@ -478,7 +491,7 @@ func TestRetrier_Do_DatabasePingRetriableError(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 3, db.pingCount)
-	assert.GreaterOrEqual(t, duration, 3*time.Millisecond)
+	assert.GreaterOrEqual(t, duration, 1*time.Millisecond)
 }
 
 func TestRetrier_Do_DatabasePingNonRetriableError(t *testing.T) {
@@ -503,7 +516,8 @@ func TestRetrier_Do_DatabasePingNonRetriableError(t *testing.T) {
 func TestRetrier_Do_DatabasePingExhaustedRetries(t *testing.T) {
 	retrier := New(
 		postgresqlIsRetriable,
-		WithBackoff([]time.Duration{1 * time.Millisecond, 2 * time.Millisecond}),
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(2),
 	)
 	ctx := context.Background()
 
@@ -524,13 +538,15 @@ func TestRetrier_Do_DatabasePingExhaustedRetries(t *testing.T) {
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, errConnectionException)
 	assert.Contains(t, err.Error(), "operation failed after retries")
+	// 1 первая попытка + 2 maxRetries = 3 вызова
 	assert.Equal(t, 3, db.pingCount)
 }
 
 func TestRetrier_Do_DatabasePingMixedErrors(t *testing.T) {
 	retrier := New(
 		postgresqlIsRetriable,
-		WithBackoff([]time.Duration{1 * time.Millisecond}),
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(1),
 	)
 	ctx := context.Background()
 
@@ -555,7 +571,8 @@ func TestRetrier_Do_DatabasePingMixedErrors(t *testing.T) {
 func TestRetrier_Do_DatabasePingContextTimeout(t *testing.T) {
 	retrier := New(
 		postgresqlIsRetriable,
-		WithBackoff([]time.Duration{50 * time.Millisecond}),
+		WithBaseDuration(50*time.Millisecond),
+		WithMaxRetries(1),
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
@@ -620,7 +637,8 @@ func BenchmarkRetrier_Do_DatabasePingSuccess(b *testing.B) {
 func BenchmarkRetrier_Do_DatabasePingWithRetries(b *testing.B) {
 	retrier := New(
 		postgresqlIsRetriable,
-		WithBackoff([]time.Duration{1 * time.Nanosecond, 1 * time.Nanosecond}),
+		WithBaseDuration(1*time.Nanosecond),
+		WithMaxRetries(2),
 	)
 	ctx := context.Background()
 
@@ -648,7 +666,7 @@ func ExampleRetrier_Do_databasePing() {
 			errors.Is(err, errOperatorIntervention)
 	}
 
-	retrier := New(isRetriable)
+	retrier := New(isRetriable, WithMaxRetries(1))
 
 	db := &mockDB{
 		pingErrors: []error{

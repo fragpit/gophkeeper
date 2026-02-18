@@ -3,7 +3,7 @@ package retry
 import (
 	"context"
 	"fmt"
-	"log"
+	"iter"
 	"time"
 )
 
@@ -16,18 +16,35 @@ type IsRetriableFunc func(err error) bool
 // Retrier provides retry functionality for operations that may fail transiently.
 // It uses a configurable backoff strategy and custom logic to determine which errors are retriable.
 type Retrier struct {
-	backoff     []time.Duration
+	base        time.Duration
+	maxRetries  int
 	IsRetriable IsRetriableFunc
+	logger      func(format string, args ...any)
 }
 
 // Option is a function that configures a Retrier.
 type Option func(*Retrier)
 
-// WithBackoff returns an Option that sets custom backoff durations for retry attempts.
-// The durations slice specifies the wait time before each retry attempt.
-func WithBackoff(durations []time.Duration) Option {
+// WithBaseDuration returns an Option that sets the base duration for exponential backoff calculations.
+// The base duration is multiplied by powers of 2 for each retry attempt.
+func WithBaseDuration(base time.Duration) Option {
 	return func(r *Retrier) {
-		r.backoff = durations
+		r.base = base
+	}
+}
+
+// WithMaxRetries returns an Option that sets the maximum number of retry attempts.
+func WithMaxRetries(max int) Option {
+	return func(r *Retrier) {
+		r.maxRetries = max
+	}
+}
+
+// WithLogger returns an Option that sets a logger for retry attempts.
+// Pass nil to disable logging.
+func WithLogger(logger func(format string, args ...any)) Option {
+	return func(r *Retrier) {
+		r.logger = logger
 	}
 }
 
@@ -36,11 +53,8 @@ func WithBackoff(durations []time.Duration) Option {
 // Additional options can be provided to customize the behavior.
 func New(IsRetriable IsRetriableFunc, opts ...Option) *Retrier {
 	r := &Retrier{
-		backoff: []time.Duration{
-			1 * time.Second,
-			3 * time.Second,
-			5 * time.Second,
-		},
+		base:        1 * time.Second,
+		maxRetries:  3,
 		IsRetriable: IsRetriable,
 	}
 
@@ -68,10 +82,12 @@ func (r *Retrier) Do(ctx context.Context, op Operation) error {
 	}
 	lastErr = err
 
-	for _, t := range r.backoff {
-		log.Printf("operation error, retrying in %v", t)
+	for d := range ExponentialBackoff(r.base, r.maxRetries) {
+		if r.logger != nil {
+			r.logger("operation error, retrying in %v", d)
+		}
 
-		timer := time.NewTimer(t)
+		timer := time.NewTimer(d)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
@@ -88,5 +104,20 @@ func (r *Retrier) Do(ctx context.Context, op Operation) error {
 		}
 		lastErr = err
 	}
+
 	return fmt.Errorf("operation failed after retries: %w", lastErr)
+}
+
+func ExponentialBackoff(
+	base time.Duration,
+	maxRetries int,
+) iter.Seq[time.Duration] {
+	return func(yield func(time.Duration) bool) {
+		for i := range maxRetries {
+			d := base * (1 << i)
+			if !yield(d) {
+				return
+			}
+		}
+	}
 }
