@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"testing"
@@ -29,14 +30,73 @@ func (m *mockDEKCreator) CreateDEK() (*model.EncryptedDEK, error) {
 	}, nil
 }
 
+type mockTokenRepo struct {
+	storeFunc       func(ctx context.Context, data *RefreshTokenData) error
+	existsFunc      func(ctx context.Context, tokenID string) (bool, error)
+	useFunc         func(ctx context.Context, tokenID string) (int, error)
+	deleteFunc      func(ctx context.Context, tokenID string) error
+	storeCalls      int
+	deleteCalls     int
+	useCalls        int
+	lastStoredToken *RefreshTokenData
+	lastDeleted     string
+	lastUsedToken   string
+}
+
+func (m *mockTokenRepo) StoreRefreshToken(
+	ctx context.Context,
+	data *RefreshTokenData,
+) error {
+	m.storeCalls++
+	m.lastStoredToken = data
+	if m.storeFunc == nil {
+		return nil
+	}
+	return m.storeFunc(ctx, data)
+}
+
+func (m *mockTokenRepo) UseRefreshToken(
+	ctx context.Context,
+	tokenID string,
+) (int, error) {
+	m.useCalls++
+	m.lastUsedToken = tokenID
+	if m.useFunc == nil {
+		return 0, fmt.Errorf("token not found")
+	}
+	return m.useFunc(ctx, tokenID)
+}
+
+func (m *mockTokenRepo) RefreshTokenExists(
+	ctx context.Context,
+	tokenID string,
+) (bool, error) {
+	if m.existsFunc == nil {
+		return false, nil
+	}
+	return m.existsFunc(ctx, tokenID)
+}
+
+func (m *mockTokenRepo) DeleteRefreshToken(
+	ctx context.Context,
+	tokenID string,
+) error {
+	m.deleteCalls++
+	m.lastDeleted = tokenID
+	if m.deleteFunc == nil {
+		return nil
+	}
+	return m.deleteFunc(ctx, tokenID)
+}
+
 func TestNewAuthService(t *testing.T) {
 	t.Run("creates auth service", func(t *testing.T) {
-		svc := NewAuthService(nil, nil, "secret", time.Hour)
+		svc := NewAuthService("secret", time.Hour, nil, nil, nil)
 		assert.NotNil(t, svc)
 	})
 
 	t.Run("creates auth service with empty secret", func(t *testing.T) {
-		svc := NewAuthService(nil, nil, "", 0)
+		svc := NewAuthService("", 0, nil, nil, nil)
 		assert.NotNil(t, svc)
 	})
 }
@@ -131,8 +191,9 @@ func TestAuthService_Register(t *testing.T) {
 
 			repo := mocks.NewMockUsersRepository(ctrl)
 			dekCreator := &mockDEKCreator{}
+			tokenRepo := &mockTokenRepo{}
 			ctx := context.Background()
-			svc := NewAuthService(repo, dekCreator, "secret", time.Minute)
+			svc := NewAuthService("secret", time.Minute, dekCreator, repo, tokenRepo)
 
 			tt.prepare(repo, dekCreator, ctx, tt.args)
 
@@ -143,11 +204,13 @@ func TestAuthService_Register(t *testing.T) {
 			}
 
 			if tt.wantToken {
-				assert.NotEmpty(t, token)
+				require.NotNil(t, token)
+				assert.NotEmpty(t, token.AccessToken)
+				assert.NotEmpty(t, token.RefreshToken)
 				assert.NoError(t, err)
 			}
 			if !tt.wantToken && tt.wantErr == nil {
-				assert.Empty(t, token)
+				assert.Nil(t, token)
 				assert.Error(t, err)
 			}
 		})
@@ -161,7 +224,7 @@ func TestAuthService_Login(t *testing.T) {
 		login    string
 		password string
 	}
-	hashed, _ := HashPassword("pass")
+	hashed, _ := hashPassword("pass")
 
 	tests := []struct {
 		name      string
@@ -219,8 +282,9 @@ func TestAuthService_Login(t *testing.T) {
 
 			repo := mocks.NewMockUsersRepository(ctrl)
 			dekCreator := &mockDEKCreator{}
+			tokenRepo := &mockTokenRepo{}
 			ctx := context.Background()
-			svc := NewAuthService(repo, dekCreator, "secret", time.Minute)
+			svc := NewAuthService("secret", time.Minute, dekCreator, repo, tokenRepo)
 
 			tt.prepare(repo, ctx, tt.args)
 
@@ -231,11 +295,136 @@ func TestAuthService_Login(t *testing.T) {
 			}
 
 			if tt.wantToken {
-				assert.NotEmpty(t, token)
+				require.NotNil(t, token)
+				assert.NotEmpty(t, token.AccessToken)
+				assert.NotEmpty(t, token.RefreshToken)
 				assert.NoError(t, err)
 			}
 			if !tt.wantToken {
-				assert.Empty(t, token)
+				assert.Nil(t, token)
+			}
+		})
+	}
+}
+
+func TestAuthService_Refresh(t *testing.T) {
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	tests := []struct {
+		name        string
+		userID      int
+		tokenID     string
+		setup       func(*mocks.MockUsersRepository, *mockTokenRepo)
+		wantErr     error
+		wantToken   bool
+		errContains string
+	}{
+		{
+			name:    "token not found",
+			userID:  10,
+			tokenID: "missing",
+			setup: func(_ *mocks.MockUsersRepository, tr *mockTokenRepo) {
+				tr.useFunc = func(ctx context.Context, tokenID string) (int, error) {
+					return 0, fmt.Errorf("token not found")
+				}
+			},
+			errContains: "use refresh token",
+		},
+		{
+			name:    "token already used (race condition)",
+			userID:  10,
+			tokenID: "token-used",
+			setup: func(_ *mocks.MockUsersRepository, tr *mockTokenRepo) {
+				tr.useFunc = func(ctx context.Context, tokenID string) (int, error) {
+					return 0, fmt.Errorf("token already used")
+				}
+			},
+			errContains: "use refresh token",
+		},
+		{
+			name:    "user ID mismatch",
+			userID:  10,
+			tokenID: "token-1",
+			setup: func(_ *mocks.MockUsersRepository, tr *mockTokenRepo) {
+				tr.useFunc = func(ctx context.Context, tokenID string) (int, error) {
+					return 99, nil // Different user ID
+				}
+			},
+			wantErr: model.ErrTokenNotFound,
+		},
+		{
+			name:    "user not found",
+			userID:  10,
+			tokenID: "token-2",
+			setup: func(r *mocks.MockUsersRepository, tr *mockTokenRepo) {
+				tr.useFunc = func(ctx context.Context, tokenID string) (int, error) {
+					return 10, nil
+				}
+				r.EXPECT().GetByID(gomock.Any(), 10).Return(nil, model.ErrUserNotFound)
+			},
+			wantErr: model.ErrUserNotFound,
+		},
+		{
+			name:    "user nil",
+			userID:  10,
+			tokenID: "token-3",
+			setup: func(r *mocks.MockUsersRepository, tr *mockTokenRepo) {
+				tr.useFunc = func(ctx context.Context, tokenID string) (int, error) {
+					return 10, nil
+				}
+				r.EXPECT().GetByID(gomock.Any(), 10).Return(nil, nil)
+			},
+			wantErr: model.ErrUserNotFound,
+		},
+		{
+			name:    "success",
+			userID:  7,
+			tokenID: "token-4",
+			setup: func(r *mocks.MockUsersRepository, tr *mockTokenRepo) {
+				tr.useFunc = func(ctx context.Context, tokenID string) (int, error) {
+					return 7, nil
+				}
+				r.EXPECT().GetByID(gomock.Any(), 7).Return(&model.User{ID: 7}, nil)
+			},
+			wantToken: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			repo := mocks.NewMockUsersRepository(ctrl)
+			tokenRepo := &mockTokenRepo{}
+			svc := NewAuthService(
+				"secret",
+				time.Minute,
+				&mockDEKCreator{},
+				repo,
+				tokenRepo,
+			)
+
+			if tt.setup != nil {
+				tt.setup(repo, tokenRepo)
+			}
+
+			got, err := svc.Refresh(context.Background(), tt.userID, tt.tokenID)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else if tt.errContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			}
+
+			if tt.wantToken {
+				require.NoError(t, err)
+				require.NotNil(t, got)
+				assert.NotEmpty(t, got.AccessToken)
+				assert.NotEmpty(t, got.RefreshToken)
+			} else {
+				assert.Nil(t, got)
 			}
 		})
 	}

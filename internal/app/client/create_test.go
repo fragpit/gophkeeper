@@ -95,25 +95,6 @@ func TestClient_CreateItem(t *testing.T) {
 			errContains: "item already exists",
 		},
 		{
-			name: "unauthorized",
-			ctx:  context.Background(),
-			item: &model.ItemDecrypted{
-				ItemMeta: &model.ItemMeta{
-					Title: "test",
-					Type:  model.ItemTypeLogin,
-				},
-				Data: []byte(`{}`),
-			},
-			serverResponse: func(w http.ResponseWriter, r *http.Request) {
-				resp := createItemResponse{Error: "invalid token"}
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusUnauthorized)
-				_ = json.NewEncoder(w).Encode(resp)
-			},
-			wantErr:     true,
-			errContains: "invalid token",
-		},
-		{
 			name: "context canceled",
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -192,7 +173,7 @@ func TestClient_CreateItem(t *testing.T) {
 
 			client, err := NewClient(
 				server.URL,
-				createTempTokenFile(t, "test-token"),
+				createTempTokenFile(t, "test-token", "refresh-token"),
 				true,
 			)
 			require.NoError(t, err)
@@ -216,6 +197,49 @@ func TestClient_CreateItem(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClient_CreateItem_RefreshFailure(t *testing.T) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc(
+		"/api/create/item",
+		func(w http.ResponseWriter, r *http.Request) {
+			resp := createItemResponse{Error: "invalid token"}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(resp)
+		},
+	)
+
+	mux.HandleFunc("/api/refresh", func(w http.ResponseWriter, r *http.Request) {
+		resp := refreshTokenResponse{Error: "refresh token expired"}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	client, err := NewClient(
+		server.URL,
+		createTempTokenFile(t, "access-1", "refresh-1"),
+		true,
+	)
+	require.NoError(t, err)
+
+	item := &model.ItemDecrypted{
+		ItemMeta: &model.ItemMeta{
+			Title: "test",
+			Type:  model.ItemTypeLogin,
+		},
+		Data: []byte(`{}`),
+	}
+
+	err = client.CreateItem(context.Background(), item)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refresh token expired")
 }
 
 func TestClient_CreateFile(t *testing.T) {
@@ -289,26 +313,6 @@ func TestClient_CreateFile(t *testing.T) {
 			errContains: "item already exists",
 		},
 		{
-			name: "unauthorized",
-			ctx:  context.Background(),
-			item: &model.ItemDecrypted{
-				ItemMeta: &model.ItemMeta{
-					Title: "test",
-					Type:  model.ItemTypeFile,
-				},
-				Data: []byte(`{}`),
-			},
-			fileContent: "content",
-			serverResponse: func(w http.ResponseWriter, r *http.Request) {
-				resp := createFileResponse{Error: "invalid token"}
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusUnauthorized)
-				_ = json.NewEncoder(w).Encode(resp)
-			},
-			wantErr:     true,
-			errContains: "unauthorized",
-		},
-		{
 			name: "context canceled",
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -369,7 +373,7 @@ func TestClient_CreateFile(t *testing.T) {
 
 			client, err := NewClient(
 				server.URL,
-				createTempTokenFile(t, "test-token"),
+				createTempTokenFile(t, "test-token", "refresh-token"),
 				true,
 			)
 			require.NoError(t, err)
@@ -397,6 +401,57 @@ func TestClient_CreateFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClient_CreateFile_RefreshFailure(t *testing.T) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc(
+		"/api/create/file",
+		func(w http.ResponseWriter, r *http.Request) {
+			resp := createFileResponse{Error: "invalid token"}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(resp)
+		},
+	)
+
+	mux.HandleFunc("/api/refresh", func(w http.ResponseWriter, r *http.Request) {
+		resp := refreshTokenResponse{Error: "refresh token expired"}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	client, err := NewClient(
+		server.URL,
+		createTempTokenFile(t, "access-1", "refresh-1"),
+		true,
+	)
+	require.NoError(t, err)
+
+	tmpFile, err := os.CreateTemp("", "testfile-*.txt")
+	require.NoError(t, err)
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+
+	_, err = tmpFile.WriteString("test content")
+	require.NoError(t, err)
+	_ = tmpFile.Close()
+
+	item := &model.ItemDecrypted{
+		ItemMeta: &model.ItemMeta{
+			Title: "test",
+			Type:  model.ItemTypeFile,
+		},
+		Data: []byte(`{}`),
+	}
+
+	err = client.CreateFile(context.Background(), item, tmpFile.Name())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refresh token expired")
 }
 
 func TestClient_CreateFile_FileErrors(t *testing.T) {
@@ -428,7 +483,7 @@ func TestClient_CreateFile_FileErrors(t *testing.T) {
 
 			client, err := NewClient(
 				server.URL,
-				createTempTokenFile(t, "test-token"),
+				createTempTokenFile(t, "test-token", "refresh-token"),
 				true,
 			)
 			require.NoError(t, err)

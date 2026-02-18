@@ -9,67 +9,100 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCreateJWTToken(t *testing.T) {
+func TestGenerateAccessToken(t *testing.T) {
 	tests := []struct {
 		name    string
 		secret  string
-		dur     time.Duration
 		id      int
 		wantErr bool
 	}{
 		{
 			name:    "success",
 			secret:  "secret",
-			dur:     1 * time.Second,
 			id:      0,
 			wantErr: false,
 		},
 		{
 			name:    "success with different user id",
 			secret:  "secret",
-			dur:     1 * time.Hour,
 			id:      123,
 			wantErr: false,
 		},
 		{
 			name:    "success with empty secret",
 			secret:  "",
-			dur:     1 * time.Minute,
 			id:      42,
-			wantErr: false,
-		},
-		{
-			name:    "success with zero duration",
-			secret:  "test",
-			dur:     0,
-			id:      1,
 			wantErr: false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			token, err := CreateJWTToken(tc.secret, tc.dur, tc.id)
+			token, err := generateAccessToken(tc.secret, tc.id)
 			if tc.wantErr {
 				require.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, token)
+				return
 			}
+			assert.NoError(t, err)
+			assert.NotEmpty(t, token)
 
+			claims := &AccessClaims{}
+			parsed, err := jwt.ParseWithClaims(
+				token,
+				claims,
+				func(t *jwt.Token) (interface{}, error) {
+					return []byte(tc.secret), nil
+				},
+			)
+			require.NoError(t, err)
+			require.True(t, parsed.Valid)
+			assert.Equal(t, tc.id, claims.UserID)
 		})
 	}
 }
 
+func TestGenerateRefreshToken(t *testing.T) {
+	token, tokenID, expiresAt, err := generateRefreshToken(
+		"secret",
+		10*time.Minute,
+		5,
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, token)
+	require.NotEmpty(t, tokenID)
+	require.True(t, expiresAt.After(time.Now()))
+
+	claims := &RefreshClaims{}
+	parsed, err := jwt.ParseWithClaims(
+		token,
+		claims,
+		func(t *jwt.Token) (interface{}, error) {
+			return []byte("secret"), nil
+		},
+	)
+	require.NoError(t, err)
+	require.True(t, parsed.Valid)
+	require.Equal(t, 5, claims.UserID)
+	require.Equal(t, tokenID, claims.TokenID)
+}
+
 func TestGetUserIDFromJWTToken(t *testing.T) {
 	validSecret := "secret"
-	validToken, err := CreateJWTToken(validSecret, 1*time.Hour, 0)
+	validToken, err := generateAccessToken(validSecret, 0)
 	require.NoError(t, err)
-	expiredToken, err := CreateJWTToken(validSecret, 0, 0)
+
+	expiredClaims := AccessClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
+		},
+		UserID: 0,
+	}
+	expiredTokenObj := jwt.NewWithClaims(jwt.SigningMethodHS256, expiredClaims)
+	expiredToken, err := expiredTokenObj.SignedString([]byte(validSecret))
 	require.NoError(t, err)
 
 	// Create token with wrong algorithm (HS384 instead of HS256)
-	wrongAlgToken := jwt.NewWithClaims(jwt.SigningMethodHS384, Claims{
+	wrongAlgToken := jwt.NewWithClaims(jwt.SigningMethodHS384, AccessClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 		},
@@ -79,7 +112,7 @@ func TestGetUserIDFromJWTToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create token with HS512 algorithm
-	hs512Token := jwt.NewWithClaims(jwt.SigningMethodHS512, Claims{
+	hs512Token := jwt.NewWithClaims(jwt.SigningMethodHS512, AccessClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 		},
@@ -147,16 +180,17 @@ func TestGetUserIDFromJWTToken(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			id, err := GetUserIDFromJWTToken(tc.secret, tc.token)
+			svc := &AuthService{jwtSecret: tc.secret}
+			id, err := svc.GetUserIDFromJWTToken(tc.token)
 			if tc.wantErr {
 				assert.Error(t, err)
 				if tc.errMsg != "" {
 					require.Contains(t, err.Error(), tc.errMsg)
 				}
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tc.wantID, id)
+				return
 			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantID, id)
 		})
 	}
 }

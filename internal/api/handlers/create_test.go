@@ -210,7 +210,7 @@ func TestNewCreateHandler(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 
 			if tc.withAuth {
-				token := jwt.NewWithClaims(jwt.SigningMethodHS256, &auth.Claims{
+				token := jwt.NewWithClaims(jwt.SigningMethodHS256, &auth.AccessClaims{
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 					},
@@ -222,7 +222,7 @@ func TestNewCreateHandler(t *testing.T) {
 				e.Use(echojwt.WithConfig(echojwt.Config{
 					SigningKey: []byte("secret"),
 					NewClaimsFunc: func(c *echo.Context) jwt.Claims {
-						return &auth.Claims{}
+						return &auth.AccessClaims{}
 					},
 				}))
 				e.POST("/", NewCreateHandler(m))

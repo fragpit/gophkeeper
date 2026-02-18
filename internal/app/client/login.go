@@ -3,12 +3,15 @@ package client
 import (
 	"context"
 	"fmt"
+
+	"github.com/fragpit/gophkeeper/internal/model"
 )
 
 // LoginResponse represents a login response payload.
 type LoginResponse struct {
-	Token string `json:"token"`
-	Error string `json:"error"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	Error        string `json:"error"`
 }
 
 // Login authenticates a user and stores the received token.
@@ -35,7 +38,10 @@ func (c *Client) Login(
 		return handleErrorResponse(resp, "user login", respData.Error)
 	}
 
-	if err := saveTokenToFile(respData.Token); err != nil {
+	if err := saveTokensToFile(model.TokenPair{
+		AccessToken:  respData.AccessToken,
+		RefreshToken: respData.RefreshToken,
+	}); err != nil {
 		return fmt.Errorf("save token: %w", err)
 	}
 

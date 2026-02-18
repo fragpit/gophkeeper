@@ -19,20 +19,20 @@ func TestHashPassword(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hash, err := HashPassword(tt.password)
+			hash, err := hashPassword(tt.password)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("HashPassword() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("hashPassword() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr {
 				if hash == "" {
-					t.Error("HashPassword() returned empty hash")
+					t.Error("hashPassword() returned empty hash")
 				}
 				if hash == tt.password {
-					t.Error("HashPassword() returned unhashed password")
+					t.Error("hashPassword() returned unhashed password")
 				}
-				if !ComparePasswordHash(tt.password, hash) {
-					t.Error("HashPassword() hash doesn't match original password")
+				if !comparePasswordHash(tt.password, hash) {
+					t.Error("hashPassword() hash doesn't match original password")
 				}
 			}
 		})
@@ -41,7 +41,7 @@ func TestHashPassword(t *testing.T) {
 
 func TestComparePasswordHash(t *testing.T) {
 	password := "testpassword123"
-	hash, err := HashPassword(password)
+	hash, err := hashPassword(password)
 	if err != nil {
 		t.Fatalf("Failed to hash password: %v", err)
 	}
@@ -61,8 +61,8 @@ func TestComparePasswordHash(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ComparePasswordHash(tt.password, tt.hash); got != tt.want {
-				t.Errorf("ComparePasswordHash() = %v, want %v", got, tt.want)
+			if got := comparePasswordHash(tt.password, tt.hash); got != tt.want {
+				t.Errorf("comparePasswordHash() = %v, want %v", got, tt.want)
 			}
 		})
 	}

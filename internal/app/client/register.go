@@ -3,12 +3,15 @@ package client
 import (
 	"context"
 	"fmt"
+
+	"github.com/fragpit/gophkeeper/internal/model"
 )
 
 // RegisterResponse represents a registration response payload.
 type RegisterResponse struct {
-	Token string `json:"token"`
-	Error string `json:"error"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	Error        string `json:"error"`
 }
 
 // Register registers a new user and saves the returned token.
@@ -35,7 +38,10 @@ func (c *Client) Register(
 		return handleErrorResponse(resp, "user register", respData.Error)
 	}
 
-	if err := saveTokenToFile(respData.Token); err != nil {
+	if err := saveTokensToFile(model.TokenPair{
+		AccessToken:  respData.AccessToken,
+		RefreshToken: respData.RefreshToken,
+	}); err != nil {
 		return fmt.Errorf("save token: %w", err)
 	}
 

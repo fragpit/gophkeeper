@@ -42,7 +42,7 @@ func NewUpdateHandler(svc UpdateService) echo.HandlerFunc {
 			return c.NoContent(http.StatusUnauthorized)
 		}
 
-		claims, ok := token.Claims.(*auth.Claims)
+		claims, ok := token.Claims.(*auth.AccessClaims)
 		if !ok {
 			return c.NoContent(http.StatusUnauthorized)
 		}
@@ -69,7 +69,12 @@ func NewUpdateHandler(svc UpdateService) echo.HandlerFunc {
 			)
 		}
 
-		if err := svc.UpdateItem(c.Request().Context(), uid, reqData.Title, reqData.Item); err != nil {
+		if err := svc.UpdateItem(
+			c.Request().Context(),
+			uid,
+			reqData.Title,
+			reqData.Item,
+		); err != nil {
 			slog.Error("update item", slog.Any("error", err))
 
 			switch {

@@ -32,7 +32,7 @@ func UserExistenceMiddleware(verifier UserVerifier) echo.MiddlewareFunc {
 			}
 
 			// Extract claims
-			claims, ok := token.Claims.(*auth.Claims)
+			claims, ok := token.Claims.(*auth.AccessClaims)
 			if !ok {
 				slog.Warn("failed to extract claims from token")
 				return c.NoContent(http.StatusUnauthorized)

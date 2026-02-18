@@ -15,20 +15,20 @@ func (c *Client) DeleteItem(ctx context.Context, title string) error {
 	}
 
 	respData := &DeleteResponse{}
-	resp, err := c.http.R().
+	req := c.http.R().
 		SetContext(ctx).
-		SetAuthToken(string(c.jwtToken)).
+		SetAuthToken(string(c.accessToken)).
 		SetQueryParam("title", title).
-		SetError(respData).
-		Delete("/api/delete/item")
+		SetError(respData)
+
+	resp, err := c.requestWithAuth(ctx, "/api/delete/item", req, req.Delete)
 	if err != nil {
 		return fmt.Errorf("delete item request: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
 	if resp.IsError() {
 		return handleErrorResponse(resp, "delete item", respData.Error)
 	}
+	defer func() { _ = resp.Body.Close() }()
 
 	fmt.Printf("Item '%s' successfully deleted\n", title)
 	return nil

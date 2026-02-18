@@ -16,6 +16,13 @@ type Repositories struct {
 	Healthcheck *healthCheckRepo
 	Users       *usersRepo
 	Items       *itemsRepo
+	Tokens      *tokenRepo
+	pool        *pgxpool.Pool
+}
+
+// Close closes the database connection pool.
+func (r *Repositories) Close() {
+	r.pool.Close()
 }
 
 // NewStorage initializes database connections and repositories.
@@ -54,5 +61,7 @@ func NewStorage(ctx context.Context, dbDSN string) (*Repositories, error) {
 		Healthcheck: NewHealthCheckRepo(dbPool, retrier),
 		Users:       NewUsersRepo(dbPool, retrier),
 		Items:       NewItemsRepo(dbPool, retrier),
+		Tokens:      NewTokenRepo(dbPool, retrier),
+		pool:        dbPool,
 	}, nil
 }
