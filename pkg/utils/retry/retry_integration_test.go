@@ -84,10 +84,11 @@ func TestRetrier_PostgreSQL_Integration_PingWithInvalidDSN(t *testing.T) {
 	defer db.Close()
 
 	isRetriable := createPostgreSQLIsRetriable()
-	retrier := New(isRetriable, WithBackoff([]time.Duration{
-		1 * time.Millisecond,
-		2 * time.Millisecond,
-	}))
+	retrier := New(
+		isRetriable,
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(2),
+	)
 
 	op := func(ctx context.Context) error {
 		return db.Ping(ctx)
@@ -219,10 +220,11 @@ func TestRetrier_PostgreSQL_Integration_DatabaseReconnect(t *testing.T) {
 	defer db.Close()
 
 	isRetriable := createPostgreSQLIsRetriable()
-	retrier := New(isRetriable, WithBackoff([]time.Duration{
-		5 * time.Millisecond,
-		10 * time.Millisecond,
-	}))
+	retrier := New(
+		isRetriable,
+		WithBaseDuration(5*time.Millisecond),
+		WithMaxRetries(2),
+	)
 
 	op := func(ctx context.Context) error {
 		return db.Ping(ctx)
