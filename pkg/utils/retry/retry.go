@@ -10,6 +10,10 @@ import (
 // Operation is a function that performs an operation that may fail and need to be retried.
 type Operation func(ctx context.Context) error
 
+// OperationWithResult is a function that performs an operation that may fail and need to be retried,
+// and returns a typed result alongside an error.
+type OperationWithResult[T any] func(ctx context.Context) (T, error)
+
 // IsRetriableFunc is a function that determines if an error should trigger a retry.
 type IsRetriableFunc func(err error) bool
 
@@ -71,12 +75,12 @@ func New(IsRetriable IsRetriableFunc, opts ...Option) *Retrier {
 // Returns nil on success, or the last error if all retry attempts are exhausted.
 // If the context is cancelled or times out, returns ctx.Err() immediately.
 func (r *Retrier) Do(ctx context.Context, op Operation) error {
-	var lastErr error
 	err := op(ctx)
 	if err == nil {
 		return nil
 	}
 
+	var lastErr error
 	if !r.IsRetriable(err) {
 		return err
 	}
@@ -120,4 +124,19 @@ func ExponentialBackoff(
 			}
 		}
 	}
+}
+
+// DoWithResult executes the given operation with retry logic and returns a typed result.
+func DoWithResult[T any](
+	ctx context.Context,
+	r *Retrier,
+	op OperationWithResult[T],
+) (T, error) {
+	var result T
+	err := r.Do(ctx, func(ctx context.Context) error {
+		var err error
+		result, err = op(ctx)
+		return err
+	})
+	return result, err
 }

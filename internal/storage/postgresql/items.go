@@ -49,40 +49,37 @@ func (r *itemsRepo) List(
 	}
 	q += ` ORDER BY updated_at DESC;`
 
-	items := make([]model.ItemMeta, 0)
-	op := func(ctx context.Context) error {
-		rows, err := r.db.Query(ctx, q, args...)
-		if err != nil {
-			return fmt.Errorf("list items: %w", err)
-		}
-		defer rows.Close()
-
-		items = items[:0]
-		for rows.Next() {
-			var title string
-			var typ string
-
-			if err := rows.Scan(&title, &typ); err != nil {
-				return fmt.Errorf("list items scan: %w", err)
+	return retry.DoWithResult(
+		ctx,
+		r.retrier,
+		func(ctx context.Context) ([]model.ItemMeta, error) {
+			rows, err := r.db.Query(ctx, q, args...)
+			if err != nil {
+				return nil, fmt.Errorf("list items: %w", err)
 			}
-			items = append(items, model.ItemMeta{
-				Title: title,
-				Type:  model.ItemType(typ),
-			})
-		}
+			defer rows.Close()
 
-		if err := rows.Err(); err != nil {
-			return fmt.Errorf("list items rows: %w", err)
-		}
+			items := make([]model.ItemMeta, 0)
+			for rows.Next() {
+				var title string
+				var typ string
 
-		return nil
-	}
+				if err := rows.Scan(&title, &typ); err != nil {
+					return nil, fmt.Errorf("list items scan: %w", err)
+				}
+				items = append(items, model.ItemMeta{
+					Title: title,
+					Type:  model.ItemType(typ),
+				})
+			}
 
-	if err := r.retrier.Do(ctx, op); err != nil {
-		return nil, err
-	}
+			if err := rows.Err(); err != nil {
+				return nil, fmt.Errorf("list items rows: %w", err)
+			}
 
-	return items, nil
+			return items, nil
+		},
+	)
 }
 
 func (r *itemsRepo) CreateItem(
@@ -118,8 +115,7 @@ func (r *itemsRepo) CreateItem(
 		}
 	}
 
-	var id int
-	op := func(ctx context.Context) error {
+	op := func(ctx context.Context) (int, error) {
 		row := r.db.QueryRow(
 			ctx,
 			q,
@@ -132,17 +128,19 @@ func (r *itemsRepo) CreateItem(
 			chunkSize,
 			noncePrefix,
 		)
+		var id int
 		if err := row.Scan(&id); err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-				return errors.Join(ErrItemExists, err)
+				return 0, errors.Join(ErrItemExists, err)
 			}
-			return fmt.Errorf("create item: %w", err)
+			return 0, fmt.Errorf("create item: %w", err)
 		}
-		return nil
+		return id, nil
 	}
 
-	if err := r.retrier.Do(ctx, op); err != nil {
+	id, err := retry.DoWithResult(ctx, r.retrier, op)
+	if err != nil {
 		return 0, err
 	}
 
@@ -163,62 +161,59 @@ func (r *itemsRepo) GetItemByTitle(
 		WHERE user_id = $1 AND title = $2;
 	`
 
-	var item *model.ItemEncrypted
-	op := func(ctx context.Context) error {
-		var (
-			typ        string
-			title      string
-			ciphertext []byte
-			nonce      []byte
+	return retry.DoWithResult(
+		ctx,
+		r.retrier,
+		func(ctx context.Context) (*model.ItemEncrypted, error) {
+			var (
+				typ        string
+				title      string
+				ciphertext []byte
+				nonce      []byte
 
-			objectKey   *string
-			chunkSize   *int32
-			noncePrefix []byte
-		)
+				objectKey   *string
+				chunkSize   *int32
+				noncePrefix []byte
+			)
 
-		row := r.db.QueryRow(ctx, q, userID, iTitle)
-		if err := row.Scan(
-			&typ,
-			&title,
-			&ciphertext,
-			&nonce,
-			&objectKey,
-			&chunkSize,
-			&noncePrefix,
-		); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return model.ErrItemNotFound
+			row := r.db.QueryRow(ctx, q, userID, iTitle)
+			if err := row.Scan(
+				&typ,
+				&title,
+				&ciphertext,
+				&nonce,
+				&objectKey,
+				&chunkSize,
+				&noncePrefix,
+			); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, model.ErrItemNotFound
+				}
+				return nil, fmt.Errorf("get item by title: %w", err)
 			}
-			return fmt.Errorf("get item by title: %w", err)
-		}
 
-		item = &model.ItemEncrypted{
-			ItemMeta: &model.ItemMeta{
-				Title: title,
-				Type:  model.ItemType(typ),
-			},
-			Ciphertext: ciphertext,
-			Nonce:      nonce,
-		}
+			item := &model.ItemEncrypted{
+				ItemMeta: &model.ItemMeta{
+					Title: title,
+					Type:  model.ItemType(typ),
+				},
+				Ciphertext: ciphertext,
+				Nonce:      nonce,
+			}
 
-		if objectKey != nil {
-			item.ObjectKey = *objectKey
-		}
-		if chunkSize != nil {
-			item.ChunkSize = int(*chunkSize)
-		}
-		if len(noncePrefix) != 0 {
-			item.NoncePrefix = noncePrefix
-		}
+			if objectKey != nil {
+				item.ObjectKey = *objectKey
+			}
+			if chunkSize != nil {
+				item.ChunkSize = int(*chunkSize)
+			}
+			if len(noncePrefix) != 0 {
+				item.NoncePrefix = noncePrefix
+			}
 
-		return nil
-	}
-
-	if err := r.retrier.Do(ctx, op); err != nil {
-		return nil, err
-	}
-
-	return item, nil
+			return item, nil
+		},
+	)
 }
 
 func (r *itemsRepo) UpdateItem(
