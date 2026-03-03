@@ -8,7 +8,6 @@ import (
 
 	"github.com/fragpit/gophkeeper/internal/model"
 	"github.com/fragpit/gophkeeper/internal/service/auth"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v5"
 )
 
@@ -147,16 +146,8 @@ func NewAuthLoginHandler(svc AuthService) echo.HandlerFunc {
 
 func NewAuthRefreshHandler(svc AuthService) echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		refreshToken, ok := c.Get("user").(*jwt.Token)
-		if !ok {
-			return c.JSON(
-				http.StatusBadRequest,
-				&authRefreshResponse{Error: "invalid refresh token"},
-			)
-		}
-
-		claims, ok := refreshToken.Claims.(*auth.RefreshClaims)
-		if !ok {
+		claims, err := extractClaims[*auth.RefreshClaims](c)
+		if err != nil {
 			return c.JSON(
 				http.StatusBadRequest,
 				&authRefreshResponse{Error: "invalid refresh token claims"},

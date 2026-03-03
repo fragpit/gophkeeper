@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/fragpit/gophkeeper/internal/service/auth"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v5"
 )
 
@@ -61,4 +63,26 @@ func ValidateParseJSONRequest(
 	}
 
 	return nil
+}
+
+func extractClaims[C *auth.AccessClaims | *auth.RefreshClaims](
+	c *echo.Context,
+) (C, error) {
+	token, ok := c.Get("user").(*jwt.Token)
+	if !ok || token == nil {
+		return nil, echo.NewHTTPError(
+			http.StatusUnauthorized,
+			http.StatusText(http.StatusUnauthorized),
+		)
+	}
+
+	claims, ok := token.Claims.(C)
+	if !ok {
+		return nil, echo.NewHTTPError(
+			http.StatusUnauthorized,
+			http.StatusText(http.StatusUnauthorized),
+		)
+	}
+
+	return claims, nil
 }

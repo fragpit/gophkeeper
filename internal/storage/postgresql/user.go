@@ -67,7 +67,13 @@ func (r *usersRepo) CreateWithDEK(
 			return fmt.Errorf("create user: %w", err)
 		}
 
-		if _, err := tx.Exec(ctx, qCreateDEK, id, dek.EncryptedKey, dek.Nonce); err != nil {
+		if _, err := tx.Exec(
+			ctx,
+			qCreateDEK,
+			id,
+			dek.EncryptedKey,
+			dek.Nonce,
+		); err != nil {
 			return fmt.Errorf("create user dek: %w", err)
 		}
 
@@ -96,35 +102,31 @@ func (r *usersRepo) GetByLogin(
 		WHERE login = $1
 	`
 
-	var u *model.User
-	op := func(ctx context.Context) error {
-		var (
-			userID    int
-			userLogin string
-			userPHash string
-		)
+	return retry.DoWithResult(
+		ctx,
+		r.retrier,
+		func(ctx context.Context) (*model.User, error) {
+			var (
+				userID    int
+				userLogin string
+				userPHash string
+			)
 
-		row := r.db.QueryRow(ctx, q, login)
-		if err := row.Scan(&userID, &userLogin, &userPHash); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return model.ErrUserNotFound
+			row := r.db.QueryRow(ctx, q, login)
+			if err := row.Scan(&userID, &userLogin, &userPHash); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, model.ErrUserNotFound
+				}
+				return nil, fmt.Errorf("get user by login: %w", err)
 			}
-			return fmt.Errorf("get user by login: %w", err)
-		}
 
-		u = &model.User{
-			ID:           userID,
-			Login:        userLogin,
-			PasswordHash: userPHash,
-		}
-		return nil
-	}
-
-	if err := r.retrier.Do(ctx, op); err != nil {
-		return nil, err
-	}
-
-	return u, nil
+			return &model.User{
+				ID:           userID,
+				Login:        userLogin,
+				PasswordHash: userPHash,
+			}, nil
+		},
+	)
 }
 
 func (r *usersRepo) GetByID(
@@ -141,35 +143,31 @@ func (r *usersRepo) GetByID(
 		WHERE id = $1
 	`
 
-	var u *model.User
-	op := func(ctx context.Context) error {
-		var (
-			id       int
-			login    string
-			passHash string
-		)
+	return retry.DoWithResult(
+		ctx,
+		r.retrier,
+		func(ctx context.Context) (*model.User, error) {
+			var (
+				id       int
+				login    string
+				passHash string
+			)
 
-		row := r.db.QueryRow(ctx, q, userID)
-		if err := row.Scan(&id, &login, &passHash); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return model.ErrUserNotFound
+			row := r.db.QueryRow(ctx, q, userID)
+			if err := row.Scan(&id, &login, &passHash); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, model.ErrUserNotFound
+				}
+				return nil, fmt.Errorf("get user by id: %w", err)
 			}
-			return fmt.Errorf("get user by id: %w", err)
-		}
 
-		u = &model.User{
-			ID:           id,
-			Login:        login,
-			PasswordHash: passHash,
-		}
-		return nil
-	}
-
-	if err := r.retrier.Do(ctx, op); err != nil {
-		return nil, err
-	}
-
-	return u, nil
+			return &model.User{
+				ID:           id,
+				Login:        login,
+				PasswordHash: passHash,
+			}, nil
+		},
+	)
 }
 
 func (r *usersRepo) GetUserDEK(
@@ -187,31 +185,27 @@ func (r *usersRepo) GetUserDEK(
 		LIMIT 1;
 	`
 
-	var dek *model.EncryptedDEK
-	op := func(ctx context.Context) error {
-		var (
-			encryptedKey []byte
-			nonce        []byte
-		)
+	return retry.DoWithResult(
+		ctx,
+		r.retrier,
+		func(ctx context.Context) (*model.EncryptedDEK, error) {
+			var (
+				encryptedKey []byte
+				nonce        []byte
+			)
 
-		row := r.db.QueryRow(ctx, q, userID)
-		if err := row.Scan(&encryptedKey, &nonce); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return model.ErrUserNotFound
+			row := r.db.QueryRow(ctx, q, userID)
+			if err := row.Scan(&encryptedKey, &nonce); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, model.ErrUserNotFound
+				}
+				return nil, fmt.Errorf("get user dek: %w", err)
 			}
-			return fmt.Errorf("get user dek: %w", err)
-		}
 
-		dek = &model.EncryptedDEK{
-			EncryptedKey: encryptedKey,
-			Nonce:        nonce,
-		}
-		return nil
-	}
-
-	if err := r.retrier.Do(ctx, op); err != nil {
-		return nil, err
-	}
-
-	return dek, nil
+			return &model.EncryptedDEK{
+				EncryptedKey: encryptedKey,
+				Nonce:        nonce,
+			}, nil
+		},
+	)
 }

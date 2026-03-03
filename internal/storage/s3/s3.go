@@ -153,13 +153,13 @@ func (s *S3Storage) Get(
 	ctx context.Context,
 	bucket, name string,
 ) (io.ReadCloser, error) {
-	var obj *minio.Object
-	err := s.retrier.Do(ctx, func(ctx context.Context) error {
-		var err error
-		obj, err = s.client.GetObject(ctx, bucket, name, minio.GetObjectOptions{})
-		return err
-	})
-
+	obj, err := retry.DoWithResult(
+		ctx,
+		s.retrier,
+		func(ctx context.Context) (*minio.Object, error) {
+			return s.client.GetObject(ctx, bucket, name, minio.GetObjectOptions{})
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("s3 get object: %w", err)
 	}
@@ -190,7 +190,11 @@ func ensureBucket(
 		return nil
 	}
 
-	if err := client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{}); err != nil {
+	if err := client.MakeBucket(
+		ctx,
+		bucketName,
+		minio.MakeBucketOptions{},
+	); err != nil {
 		return fmt.Errorf("create bucket: %w", err)
 	}
 	return nil

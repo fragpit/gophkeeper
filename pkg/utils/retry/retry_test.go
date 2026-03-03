@@ -686,3 +686,193 @@ func ExampleRetrier_Do_databasePing() {
 	// Output:
 	// Ping successful: true, Attempts: 2
 }
+
+func TestDoWithResult_Success(t *testing.T) {
+	retrier := New(alwaysRetriable)
+	ctx := context.Background()
+
+	callCount := 0
+	result, err := DoWithResult(
+		ctx,
+		retrier,
+		func(ctx context.Context) (int, error) {
+			callCount++
+			return 42, nil
+		},
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 42, result)
+	assert.Equal(t, 1, callCount)
+}
+
+func TestDoWithResult_NonRetriableError(t *testing.T) {
+	retrier := New(neverRetriable)
+	ctx := context.Background()
+
+	callCount := 0
+	result, err := DoWithResult(
+		ctx,
+		retrier,
+		func(ctx context.Context) (string, error) {
+			callCount++
+			return "", errNonRetriable
+		},
+	)
+
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, errNonRetriable)
+	assert.Equal(t, "", result)
+	assert.Equal(t, 1, callCount)
+}
+
+func TestDoWithResult_RetriableErrorThenSuccess(t *testing.T) {
+	retrier := New(
+		alwaysRetriable,
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(2),
+	)
+	ctx := context.Background()
+
+	callCount := 0
+	result, err := DoWithResult(
+		ctx,
+		retrier,
+		func(ctx context.Context) (int, error) {
+			callCount++
+			if callCount < 3 {
+				return 0, errRetriable
+			}
+			return 99, nil
+		},
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 99, result)
+	assert.Equal(t, 3, callCount)
+}
+
+func TestDoWithResult_ExhaustedRetries(t *testing.T) {
+	retrier := New(
+		alwaysRetriable,
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(2),
+	)
+	ctx := context.Background()
+
+	callCount := 0
+	result, err := DoWithResult(
+		ctx,
+		retrier,
+		func(ctx context.Context) (int, error) {
+			callCount++
+			return 0, errRetriable
+		},
+	)
+
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, errRetriable)
+	assert.Contains(t, err.Error(), "operation failed after retries")
+	assert.Equal(t, 0, result)
+	// 1 первая попытка + 2 maxRetries = 3 вызова
+	assert.Equal(t, 3, callCount)
+}
+
+func TestDoWithResult_ContextCancellation(t *testing.T) {
+	retrier := New(
+		alwaysRetriable,
+		WithBaseDuration(1*time.Second),
+		WithMaxRetries(3),
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	callCount := 0
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	result, err := DoWithResult(
+		ctx,
+		retrier,
+		func(ctx context.Context) (int, error) {
+			callCount++
+			return 0, errRetriable
+		},
+	)
+
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, 0, result)
+	assert.Equal(t, 1, callCount)
+}
+
+func TestDoWithResult_PointerResult(t *testing.T) {
+	type item struct{ ID int }
+	retrier := New(
+		alwaysRetriable,
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(1),
+	)
+	ctx := context.Background()
+
+	callCount := 0
+	result, err := DoWithResult(
+		ctx,
+		retrier,
+		func(ctx context.Context) (*item, error) {
+			callCount++
+			if callCount < 2 {
+				return nil, errRetriable
+			}
+			return &item{ID: 7}, nil
+		},
+	)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 7, result.ID)
+	assert.Equal(t, 2, callCount)
+}
+
+func BenchmarkDoWithResult_Success(b *testing.B) {
+	retrier := New(alwaysRetriable)
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = DoWithResult(ctx, retrier, func(ctx context.Context) (int, error) {
+			return 1, nil
+		})
+	}
+}
+
+func ExampleDoWithResult() {
+	isRetriable := func(err error) bool {
+		return errors.Is(err, errRetriable)
+	}
+
+	retrier := New(
+		isRetriable,
+		WithBaseDuration(1*time.Millisecond),
+		WithMaxRetries(2),
+	)
+
+	callCount := 0
+	result, err := DoWithResult(
+		context.Background(),
+		retrier,
+		func(ctx context.Context) (string, error) {
+			callCount++
+			if callCount < 2 {
+				return "", errRetriable
+			}
+			return "ok", nil
+		},
+	)
+
+	fmt.Printf("Result: %s, Error: %v, Calls: %d\n", result, err, callCount)
+	// Output:
+	// Result: ok, Error: <nil>, Calls: 2
+}
