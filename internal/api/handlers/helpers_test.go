@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fragpit/gophkeeper/internal/service/auth"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v5"
 )
 
@@ -117,4 +119,108 @@ func TestValidateParseJSONRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExtractClaims(t *testing.T) {
+	newContext := func() *echo.Context {
+		e := echo.New()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rec := httptest.NewRecorder()
+		return e.NewContext(req, rec)
+	}
+
+	t.Run("valid AccessClaims", func(t *testing.T) {
+		c := newContext()
+		token := jwt.NewWithClaims(
+			jwt.SigningMethodHS256,
+			&auth.AccessClaims{UserID: 42},
+		)
+		c.Set("user", token)
+
+		claims, err := extractClaims[*auth.AccessClaims](c)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if claims.UserID != 42 {
+			t.Fatalf("expected UserID 42, got %d", claims.UserID)
+		}
+	})
+
+	t.Run("valid RefreshClaims", func(t *testing.T) {
+		c := newContext()
+		token := jwt.NewWithClaims(
+			jwt.SigningMethodHS256,
+			&auth.RefreshClaims{UserID: 7, TokenID: "tok"},
+		)
+		c.Set("user", token)
+
+		claims, err := extractClaims[*auth.RefreshClaims](c)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if claims.UserID != 7 || claims.TokenID != "tok" {
+			t.Fatalf("unexpected claims: %+v", claims)
+		}
+	})
+
+	t.Run("no token in context", func(t *testing.T) {
+		c := newContext()
+		// "user" key not set at all
+
+		_, err := extractClaims[*auth.AccessClaims](c)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		var httpErr *echo.HTTPError
+		if !errors.As(err, &httpErr) || httpErr.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401 HTTPError, got %v", err)
+		}
+	})
+
+	t.Run("nil token in context", func(t *testing.T) {
+		c := newContext()
+		c.Set("user", nil)
+
+		_, err := extractClaims[*auth.AccessClaims](c)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		var httpErr *echo.HTTPError
+		if !errors.As(err, &httpErr) || httpErr.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401 HTTPError, got %v", err)
+		}
+	})
+
+	t.Run("wrong claims type", func(t *testing.T) {
+		c := newContext()
+		// AccessClaims token, but extracting as RefreshClaims
+		token := jwt.NewWithClaims(
+			jwt.SigningMethodHS256,
+			&auth.AccessClaims{UserID: 1},
+		)
+		c.Set("user", token)
+
+		_, err := extractClaims[*auth.RefreshClaims](c)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		var httpErr *echo.HTTPError
+		if !errors.As(err, &httpErr) || httpErr.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401 HTTPError, got %v", err)
+		}
+	})
+
+	t.Run("non-token value in context", func(t *testing.T) {
+		c := newContext()
+		c.Set("user", "not-a-jwt-token")
+
+		_, err := extractClaims[*auth.AccessClaims](c)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		var httpErr *echo.HTTPError
+		if !errors.As(err, &httpErr) || httpErr.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401 HTTPError, got %v", err)
+		}
+	})
 }

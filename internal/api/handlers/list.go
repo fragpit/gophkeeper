@@ -7,7 +7,6 @@ import (
 
 	"github.com/fragpit/gophkeeper/internal/model"
 	"github.com/fragpit/gophkeeper/internal/service/auth"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v5"
 )
 
@@ -30,15 +29,9 @@ type listResponse struct {
 // NewListHandler returns an Echo handler that lists items for the authenticated user.
 func NewListHandler(svc ItemsService) echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		v := c.Get("user")
-		token, ok := v.(*jwt.Token)
-		if !ok || token == nil {
-			return c.NoContent(http.StatusUnauthorized)
-		}
-
-		claims, ok := token.Claims.(*auth.AccessClaims)
-		if !ok {
-			return c.NoContent(http.StatusUnauthorized)
+		claims, err := extractClaims[*auth.AccessClaims](c)
+		if err != nil {
+			return err
 		}
 
 		uid := claims.UserID
